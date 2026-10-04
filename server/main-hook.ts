@@ -76,6 +76,16 @@ try {
     }
   }
 
+  function matchCorners(handle) {
+    if (blur && typeof blur.matchCorners === "function") {
+      try {
+        blur.matchCorners(handle);
+      } catch (matchCornersErr) {
+        /* ignore — best-effort, like blur */
+      }
+    }
+  }
+
   var settingsPath = path.join(app.getPath("userData"), "paseo-vibrancy.json");
 
   function readSettings() {
@@ -93,6 +103,7 @@ try {
     if (!win || typeof win.setVibrancy !== "function") {
       return;
     }
+    matchCorners(win.getNativeWindowHandle());
     if (current.material !== "none") {
       win.setVibrancy(current.material);
       setBlur(win.getNativeWindowHandle(), 0);
