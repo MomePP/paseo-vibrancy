@@ -8,9 +8,10 @@ import { compileBlur } from "../server/blur.ts";
 
 interface BlurExports {
   setBlur: (handle: Buffer, radius: number) => boolean;
+  matchCorners: (handle: Buffer) => boolean;
 }
 
-test("compileBlur compiles blur.node and setBlur rejects a null-pointer buffer without crashing", async () => {
+test("compileBlur compiles blur.node and its exports reject a null-pointer buffer without crashing", async () => {
   const dir = mkdtempSync(join(tmpdir(), "vibrancy-blur-"));
   const dest = join(dir, "blur.node");
   try {
@@ -22,6 +23,7 @@ test("compileBlur compiles blur.node and setBlur rejects a null-pointer buffer w
 
     assert.equal(typeof addon.exports.setBlur, "function");
     assert.equal(addon.exports.setBlur(Buffer.alloc(8), 30), false);
+    assert.equal(addon.exports.matchCorners(Buffer.alloc(8)), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
