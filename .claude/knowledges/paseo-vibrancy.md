@@ -364,14 +364,14 @@ update completing).
   `pv.js` re-applies (`apply(win)`) on the window's own `'show'` event, not
   just at creation.
 - **A transparent window gets square corners in the window server.** On
-  macOS 26, AppKit clips a transparent window's content at the system radius
-  (16 pt) itself, but because its corner mask does not define the shadow
-  shape (`-[NSWindow _cornerMaskShouldDefineShadow]` is `NO` for a clear
-  background), the pre-commit flush sends the window server a corner radius
-  of 0. The background blur and the window outline follow the window
-  server's shape, so glass showed past the rounded content: a square glass
-  corner, or a dark outline with a smaller radius than the content. Stock
-  Paseo (opaque) reports radii `16,16,16,16` from
+  macOS 27 (observed on 27.0.1), AppKit clips a transparent window's content
+  at the system radius (16 pt) itself, but because its corner mask does not
+  define the shadow shape (`-[NSWindow _cornerMaskShouldDefineShadow]` is
+  `NO` for a clear background), the pre-commit flush sends the window server
+  a corner radius of 0. The background blur and the window outline follow
+  the window server's shape, so glass showed past the rounded content: a
+  square glass corner, or a dark outline with a smaller radius than the
+  content. Stock Paseo (opaque) reports radii `16,16,16,16` from
   `SLSWindowIteratorGetCornerRadii`; the patched window reported `0,0,0,0`.
   Setting the radius once is not enough: AppKit recomputes the mask through
   `-[NSWindow _cornerMaskChanged]` on every appearance change (Paseo's theme,
