@@ -57,7 +57,7 @@ test/                       node --test
 | `index.client.tsx`, `client/` | renderer | Vibrancy settings screen, live `--paseo-*` CSS variables, update notice |
 | `index.server.ts`, `server/` | daemon subprocess (full Node) | release fetch/verify, build, swap, settings file |
 | `pv.js` (generated into the bundle) | Paseo's Electron main process | per-window material/blur, watches the settings file |
-| `blur.node` (compiled into the bundle) | Paseo's Electron main process | `setBlur(handle, radius)` via private CGS calls, `dlsym`'d so a missing symbol is a no-op, not a crash |
+| `blur.node` (compiled into the bundle) | Paseo's Electron main process | `setBlur(handle, radius)` via private CGS calls, `dlsym`'d so a missing symbol is a no-op, not a crash; `matchCorners(handle)` keeps the window server's corner radius equal to AppKit's |
 
 ## Live appearance settings
 
@@ -86,6 +86,8 @@ Defaults: `{ material: "none", blurRadius: 30, tint: 0.85, paneGlass: true }`.
   loses focus, read once by `setVibrancy`. Material ≠ `"none"`:
   `win.setVibrancy(material)` and `blur.setBlur(handle, 0)`. Material
   `"none"`: `win.setVibrancy(null)` and `blur.setBlur(handle, blurRadius)`.
+  Every `apply` also calls `blur.matchCorners(handle)` (see the corners
+  gotcha below).
 - **Renderer (`client/vibrancy-css.ts`).** On load and on every change, sets on
   `document.documentElement`:
   - `--paseo-tint` — consumed by the body wash rule:
@@ -361,6 +363,24 @@ update completing).
   yet, so a blur call issued from `browser-window-created` targets nothing.
   `pv.js` re-applies (`apply(win)`) on the window's own `'show'` event, not
   just at creation.
+- **A transparent window gets square corners in the window server.** On
+  macOS 27 (observed on 27.0.1), AppKit clips a transparent window's content
+  at the system radius (16 pt) itself, but because its corner mask does not
+  define the shadow shape (`-[NSWindow _cornerMaskShouldDefineShadow]` is
+  `NO` for a clear background), the pre-commit flush sends the window server
+  a corner radius of 0. The background blur and the window outline follow
+  the window server's shape, so glass showed past the rounded content: a
+  square glass corner, or a dark outline with a smaller radius than the
+  content. Stock Paseo (opaque) reports radii `16,16,16,16` from
+  `SLSWindowIteratorGetCornerRadii`; the patched window reported `0,0,0,0`.
+  Setting the radius once is not enough: AppKit recomputes the mask through
+  `-[NSWindow _cornerMaskChanged]` on every appearance change (Paseo's theme,
+  macOS auto light/dark) and around native fullscreen, and writes 0 again.
+  That is why a relaunch "fixed" it for a while. `matchCorners` adds a
+  `_cornerMaskShouldDefineShadow` returning `YES` to the window's class and
+  calls `_cornerMaskChanged`, so AppKit itself sends 16 on every recompute.
+  Both selectors are checked with `respondsToSelector:` first; if a future
+  macOS drops them, `matchCorners` returns `false` and does nothing.
 - **`runningBundle` must walk to the outermost `.app`.** The daemon's own
   `execPath` resolves inside
   `…/Paseo-Vibrancy.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper`
