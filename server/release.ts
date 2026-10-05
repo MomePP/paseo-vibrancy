@@ -18,6 +18,7 @@ import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { promisify } from "node:util";
 
+import type { BuildStepId } from "../shared/build-progress.ts";
 import type { Release } from "../shared/rpc.ts";
 import { compareVersions } from "../shared/version.ts";
 import { fs, fsp } from "./fs.ts";
@@ -150,20 +151,36 @@ export async function verifyPaseoSignature(appPath: string): Promise<void> {
   await execFileAsync("codesign", ["--verify", "--deep", "--strict", `-R=${PASEO_REQUIREMENT}`, appPath]);
 }
 
+export type DownloadProgress = (
+  step: Extract<BuildStepId, "download" | "extract" | "verify">,
+  fraction: number,
+  detail: string | null,
+) => void;
+
+function downloadDetail(bytes: number, size: number): string {
+  return `${Math.round(bytes / 1e6)} / ${Math.round(size / 1e6)} MB`;
+}
+
 /**
  * Downloads `release.zipUrl` straight to disk while hashing (zips run
- * ~179 MB; nothing is buffered in memory), checks size and base64 sha512,
+ * ~186 MB; nothing is buffered in memory), checks size and base64 sha512,
  * extracts with `ditto`, verifies the extracted bundle's signature, then
  * moves it into `cacheDir` as `Paseo-<version>.app` and drops the zip and any
  * older pristine copies. Any failure leaves `cacheDir` exactly as it found it.
+ * `onProgress` hears each step as it starts, and the download's byte fraction.
  */
-export async function downloadVerified(release: Release, cacheDir: string = DEFAULT_CACHE_DIR): Promise<string> {
+export async function downloadVerified(
+  release: Release,
+  cacheDir: string = DEFAULT_CACHE_DIR,
+  onProgress?: DownloadProgress,
+): Promise<string> {
   await mkdir(cacheDir, { recursive: true });
   const staging = join(tmpdir(), `paseo-vibrancy-dl-${process.pid}-${Date.now()}`);
   await mkdir(staging, { recursive: true });
 
   try {
     const zipPath = join(staging, "download.zip");
+    onProgress?.("download", 0, downloadDetail(0, release.size));
     const response = await fetch(release.zipUrl);
     if (!response.ok || !response.body) {
       throw new Error(`download failed: HTTP ${response.status}`);
@@ -178,6 +195,7 @@ export async function downloadVerified(release: Release, cacheDir: string = DEFA
           hash.update(chunk);
           bytes += chunk.length;
           yield chunk;
+          onProgress?.("download", bytes / release.size, downloadDetail(bytes, release.size));
         }
       },
       createWriteStream(zipPath),
@@ -193,6 +211,7 @@ export async function downloadVerified(release: Release, cacheDir: string = DEFA
 
     const extractDir = join(staging, "extracted");
     await mkdir(extractDir, { recursive: true });
+    onProgress?.("extract", 0, null);
     await execFileAsync("ditto", ["-x", "-k", zipPath, extractDir]);
 
     const extractedName = (await readdir(extractDir)).find((name) => name.endsWith(".app"));
@@ -201,6 +220,7 @@ export async function downloadVerified(release: Release, cacheDir: string = DEFA
     }
     const extractedApp = join(extractDir, extractedName);
 
+    onProgress?.("verify", 0, null);
     await verifyPaseoSignature(extractedApp);
 
     const finalPath = join(cacheDir, `Paseo-${release.version}.app`);

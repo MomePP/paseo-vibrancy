@@ -299,15 +299,18 @@ export const FRAME_RATE: ReTableEntry[] = [
     pattern: /SYNCED_LOADER_DURATION_MS:950,/g,
     replacement: `SYNCED_LOADER_DURATION_MS:${950 * LOADER_SLOWDOWN},`,
   },
+  // The lookbehind keeps the unanchored identifier from being retried at every
+  // character inside long word runs: without it these two scans alone took
+  // ~5 s each on the 22 MB bundle, blocking the plugin server.
   {
     label: "idle frame rate: synced loader tick",
     pattern:
-      /([A-Za-z_$][\w$]*)\.value!==([A-Za-z_$][\w$]*)&&\(\1\.value=\2\),requestAnimationFrame\(([A-Za-z_$][\w$]*)\)/g,
+      /(?<![\w$])([A-Za-z_$][\w$]*)\.value!==([A-Za-z_$][\w$]*)&&\(\1\.value=\2\),requestAnimationFrame\(([A-Za-z_$][\w$]*)\)/g,
     replacement: `$1.value!==$2&&($1.value=$2),setTimeout($3,${LOADER_POLL_MS})`,
   },
   {
     label: "idle frame rate: synced loader kick",
-    pattern: /([A-Za-z_$][\w$]*)\.value=([A-Za-z_$][\w$]*)\.value,requestAnimationFrame\(([A-Za-z_$][\w$]*)\)/g,
+    pattern: /(?<![\w$])([A-Za-z_$][\w$]*)\.value=([A-Za-z_$][\w$]*)\.value,requestAnimationFrame\(([A-Za-z_$][\w$]*)\)/g,
     replacement: `$1.value=$2.value,setTimeout($3,${LOADER_POLL_MS})`,
   },
   {

@@ -1,8 +1,9 @@
 /**
  * The Vibrancy settings screen. Appearance edits `VibrancySettings` live (CSS applied
  * immediately, `setSettingsRpc` debounced 150ms so dragging a slider doesn't
- * flood the server). Build reports the running/built-from/latest versions
- * and drives rebuild/update, both of which restart Paseo.
+ * flood the server). Build reports the running/built-from/latest versions,
+ * drives rebuild/update (both restart Paseo), and shows a progress bar
+ * while a build runs.
  *
  * Also mounted (via `index.client.tsx`'s conditional `addScreen`) as the
  * launch-time "update available" / "rebuild needed" sidebar surface — same
@@ -25,6 +26,7 @@ import {
 } from "@getpaseo/plugin/client/ui";
 import { useToast } from "@getpaseo/plugin/client/react-native";
 
+import { BUILD_STEPS } from "../shared/build-progress.ts";
 import { VIBRANCY_DEFAULTS, MATERIALS, TERMINAL_DEFAULTS } from "../shared/vibrancy.ts";
 import type { VibrancySettings } from "../shared/vibrancy.ts";
 import { buildRpc, checkUpdateRpc, getSettingsRpc, setSettingsRpc, statusRpc } from "../shared/rpc.ts";
@@ -34,6 +36,7 @@ import { applyVibrancyCss } from "./vibrancy-css.ts";
 import RangeRow from "./RangeRow.tsx";
 
 const SET_SETTINGS_DEBOUNCE_MS = 150;
+const BUILD_POLL_MS = 500;
 
 /** `0-60` for the blur slider's native-platform fallback (discrete steps). */
 const BLUR_STEPS = [0, 10, 20, 30, 40, 50, 60];
@@ -80,8 +83,11 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [status, setStatus] = useState<VibrancyStatus | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Set once `vibrancy.build` queues a job, so polling starts before `status.building` has been fetched. */
+  const [buildQueued, setBuildQueued] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** The toast for the build this screen started; null when the screen joined a build already running. */
+  const buildSuccessRef = useRef<string | null>(null);
   const unmountedRef = useRef(false);
   /** The most recently edited settings not yet confirmed saved; flushed on unmount. */
   const pendingRef = useRef<VibrancySettings | null>(null);
@@ -108,7 +114,6 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
     return () => {
       unmountedRef.current = true;
       clearTimeout(debounceRef.current);
-      clearTimeout(pollTimerRef.current);
       const pending = pendingRef.current;
       pendingRef.current = null;
       if (pending) {
@@ -144,42 +149,54 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
 
   /**
    * `vibrancy.build` returns as soon as the build is queued or busy (the
-   * daemon's plugin RPCs time out at 30s, well short of a build),
-   * so a non-busy response isn't the outcome: poll `vibrancy.status` every
-   * second, keeping buttons disabled, until `building` flips back to
-   * false, then surface the report/error it settled with.
+   * daemon's plugin RPCs time out at 30s, well short of an Update), so its
+   * response isn't the outcome. While a build runs, whether this screen
+   * started it or was reopened mid-build, poll `vibrancy.status` until
+   * `building` flips back to false, then surface the error it settled with
+   * or a success toast.
    */
-  async function pollUntilBuildDone(successMessage: string) {
-    for (;;) {
-      const { promise, resolve } = Promise.withResolvers<void>();
-      pollTimerRef.current = setTimeout(resolve, 1000);
-      await promise;
-      if (unmountedRef.current) {
-        return;
-      }
+  const polling = buildQueued || Boolean(status?.building);
+  useEffect(() => {
+    if (!polling) {
+      return;
+    }
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = async () => {
       let latestStatus: VibrancyStatus;
       try {
         latestStatus = await fetchStatus({});
       } catch (error) {
-        if (!unmountedRef.current) {
+        if (!cancelled) {
+          setBuildQueued(false);
           toast.error(error instanceof Error ? error.message : "Failed to load Vibrancy status");
         }
         return;
       }
-      if (unmountedRef.current) {
+      if (cancelled) {
         return;
       }
       setStatus(latestStatus);
-      if (!latestStatus.building) {
-        if (latestStatus.lastError) {
-          toast.error(latestStatus.lastError);
-        } else {
-          toast.show(successMessage);
-        }
+      if (latestStatus.building) {
+        timer = setTimeout(tick, BUILD_POLL_MS);
         return;
       }
-    }
-  }
+      setBuildQueued(false);
+      const successMessage = buildSuccessRef.current ?? "Build finished";
+      buildSuccessRef.current = null;
+      if (latestStatus.lastError) {
+        toast.error(latestStatus.lastError);
+      } else {
+        toast.show(successMessage);
+      }
+    };
+    timer = setTimeout(tick, BUILD_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [polling]);
 
   async function runBuild(input: { version?: string; restart: boolean }, successMessage: string) {
     setBusy(true);
@@ -189,14 +206,16 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
         toast.error(queued.error ?? "Build already running");
         return;
       }
-      await pollUntilBuildDone(successMessage);
+      buildSuccessRef.current = successMessage;
+      if (!unmountedRef.current) {
+        setBuildQueued(true);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Build failed");
     } finally {
       if (!unmountedRef.current) {
         setBusy(false);
       }
-      refreshStatus();
     }
   }
 
@@ -221,7 +240,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
 
   const isWeb = layout.platform === "web";
   const runningVibrancyBuild = status?.runningVibrancyBuild ?? false;
-  const appearanceDisabled = !settingsLoaded || !runningVibrancyBuild || busy;
+  const appearanceDisabled = !settingsLoaded || !runningVibrancyBuild || busy || polling;
   const blurDisabled = appearanceDisabled || settings.material !== "none";
   const latest = status?.latest ?? null;
   const updateAvailable =
@@ -422,6 +441,8 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
   );
 
   const needsRebuild = Boolean(status?.runningVibrancyBuild && !status.fingerprintMatches);
+  const progress = status?.progress ?? null;
+  const progressPercent = progress ? Math.round(progress.fraction * 100) : 0;
 
   const buildSection = (
     <SettingsSection title="Build">
@@ -448,11 +469,28 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
             </View>
           </SettingsRow>
         )}
+        {progress && (
+          <SettingsRow
+            label={
+              progress.step === "restart" ? "Restarting Paseo" : BUILD_STEPS.find((s) => s.id === progress.step)!.label
+            }
+            hint={progress.detail ?? undefined}
+          >
+            <View style={{ width: 180, flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={{ flex: 1, height: 4, borderRadius: 2, overflow: "hidden", backgroundColor: theme.colors.border }}>
+                <View style={{ width: `${progressPercent}%`, height: "100%", backgroundColor: theme.colors.accent }} />
+              </View>
+              <Text style={{ minWidth: 36, textAlign: "right", color: theme.colors.foregroundMuted }}>
+                {progressPercent}%
+              </Text>
+            </View>
+          </SettingsRow>
+        )}
         <SettingsAction
           label="Check for updates"
           actionLabel="Check"
           onPress={onCheckUpdate}
-          disabled={busy || status?.building}
+          disabled={busy || polling}
         />
         {updateAvailable && latest && (
           <SettingsAction
@@ -460,7 +498,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
             hint={`Downloads and builds Paseo ${latest.version}`}
             actionLabel="Update & restart"
             onPress={() => runBuild({ version: latest.version, restart: true }, `Updated to ${latest.version}`)}
-            disabled={busy || status?.building}
+            disabled={busy || polling}
           />
         )}
         <SettingsAction
@@ -468,7 +506,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
           hint="Restarts Paseo and interrupts running agents"
           actionLabel="Rebuild & restart"
           onPress={() => runBuild({ restart: true }, "Rebuilt the Vibrancy copy")}
-          disabled={busy || status?.building}
+          disabled={busy || polling}
         />
       </SettingsCard>
     </SettingsSection>

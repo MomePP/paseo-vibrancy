@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -183,6 +184,54 @@ test("downloadVerified rejects a sha512 mismatch and leaves the cache dir empty"
 
   await assert.rejects(() => downloadVerified(release, cacheDir), /sha512 mismatch/);
   assert.deepEqual(readdirSync(cacheDir), []);
+});
+
+test("downloadVerified reports the byte fraction while downloading, then extract and verify", async (t) => {
+  const srcDir = mkdtempSync(join(tmpdir(), "vibrancy-release-src-"));
+  t.after(() => rmSync(srcDir, { recursive: true, force: true }));
+  mkdirSync(join(srcDir, "Fake.app"));
+  writeFileSync(join(srcDir, "Fake.app", "payload.bin"), randomBytes(3_000_000));
+
+  const zipDir = mkdtempSync(join(tmpdir(), "vibrancy-release-zip-"));
+  t.after(() => rmSync(zipDir, { recursive: true, force: true }));
+  const zipPath = join(zipDir, "Paseo-0.11.0-beta.3-arm64.zip");
+  await execFileAsync("ditto", ["-c", "-k", "--sequesterRsrc", srcDir, zipPath]);
+  const zipBytes = readFileSync(zipPath);
+
+  const server = createServer((_req, res) => {
+    res.setHeader("content-type", "application/zip");
+    res.end(zipBytes);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const address = server.address();
+  if (address === null || typeof address === "string") throw new Error("expected AddressInfo");
+
+  const cacheDir = mkdtempSync(join(tmpdir(), "vibrancy-release-cache-"));
+  t.after(() => rmSync(cacheDir, { recursive: true, force: true }));
+
+  const release: Release = {
+    version: "0.11.0-beta.3",
+    zipUrl: `http://127.0.0.1:${address.port}/Paseo-0.11.0-beta.3-arm64.zip`,
+    sha512: createHash("sha512").update(zipBytes).digest("base64"),
+    size: zipBytes.length,
+  };
+
+  const events: Array<{ step: string; fraction: number; detail: string | null }> = [];
+  // The fake app is unsigned, so the run ends at the signature check.
+  await assert.rejects(() =>
+    downloadVerified(release, cacheDir, (step, fraction, detail) => events.push({ step, fraction, detail })),
+  );
+
+  const steps = events.map((e) => e.step).filter((step, i, all) => step !== all[i - 1]);
+  assert.deepEqual(steps, ["download", "extract", "verify"]);
+  const downloads = events.filter((e) => e.step === "download");
+  assert.ok(downloads.length > 2);
+  assert.deepEqual(downloads[0], { step: "download", fraction: 0, detail: "0 / 3 MB" });
+  assert.deepEqual(downloads.at(-1), { step: "download", fraction: 1, detail: "3 / 3 MB" });
+  for (let i = 1; i < downloads.length; i++) {
+    assert.ok(downloads[i].fraction >= downloads[i - 1].fraction);
+  }
 });
 
 test("sweepOlderPristine removes only strictly-older Paseo-*.app entries", async (t) => {

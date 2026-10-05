@@ -2,17 +2,16 @@
  * Server entry: registers the five `shared/rpc.ts` contracts against live
  * (or injected, for tests) release/build/swap dependencies, serialises
  * builds through a single-flight queue, and keeps the small bits of
- * in-process state (`latest`, `lastReport`, `lastError`) `vibrancy.status`
- * reports.
+ * in-process state (`latest`, `lastReport`, `lastError`, `progress`)
+ * `vibrancy.status` reports.
  *
  * `vibrancy.build` returns as soon as a build is queued (or rejects
  * immediately if one is already running) rather than waiting for it to
  * finish: Paseo's daemon rejects plugin RPCs that run past its 30 s
- * timeout, and a rebuild from cache (~21.5 s) or an Update (179 MB
- * download + ditto + `codesign --deep` verify + build) routinely exceeds
- * that. The actual work runs in the background through `queue`; its
- * outcome lands in `lastReport`/`lastError` for the client to pick up by
- * polling `vibrancy.status`.
+ * timeout, and an Update (~186 MB download + ditto + `codesign --deep`
+ * verify + build) routinely exceeds that. The actual work runs in the
+ * background through `queue`; its outcome lands in `lastReport`/`lastError`
+ * for the client to pick up by polling `vibrancy.status`.
  */
 
 import { homedir } from "node:os";
@@ -33,6 +32,8 @@ import {
 } from "./server/release.ts";
 import { isVibrancyBuild, readStamp, runningBundle } from "./server/status.ts";
 import { startSwap as startSwapDefault } from "./server/swap.ts";
+import { buildPlan, overallFraction } from "./shared/build-progress.ts";
+import type { BuildProgress, BuildStepId } from "./shared/build-progress.ts";
 import { buildRpc, checkUpdateRpc, getSettingsRpc, setSettingsRpc, statusRpc } from "./shared/rpc.ts";
 import type { Release } from "./shared/rpc.ts";
 import type { VibrancySettings } from "./shared/vibrancy.ts";
@@ -117,6 +118,7 @@ export function createHandlers(deps: VibrancyHandlerDeps = {}) {
   let latest: Release | null = null;
   let lastReport: string[] = [];
   let lastError: string | null = null;
+  let progress: BuildProgress | null = null;
 
   async function status() {
     const bundle = runningBundle(execPath);
@@ -140,6 +142,7 @@ export function createHandlers(deps: VibrancyHandlerDeps = {}) {
       lastReport,
       lastError,
       building: queue.busy,
+      progress,
     };
   }
 
@@ -159,6 +162,9 @@ export function createHandlers(deps: VibrancyHandlerDeps = {}) {
    * which tracks it) only ever settles once that state is already correct.
    * `version` defaults to the running bundle's version (the client omits it
    * for "Rebuild", passes the checked `latest.version` for "Update").
+   * `progress` follows the steps while the job runs and clears when it
+   * settles, except after a successful restart: the swap quits this process
+   * within about a second, so it is left on the restart step.
    */
   async function runBuildJob(input: BuildInput): Promise<void> {
     try {
@@ -167,17 +173,27 @@ export function createHandlers(deps: VibrancyHandlerDeps = {}) {
       if (!version) {
         throw new Error("no version to build: nothing running and none requested");
       }
-      const source = doCachedPristine(version, cacheDir) ?? (await doDownloadVerified(await doFetchRelease(version), cacheDir));
-      const { report } = await doBuildStaging({ source, staging, ghosttyPath, settingsFile });
+      const cached = doCachedPristine(version, cacheDir);
+      const plan = buildPlan(cached === null);
+      const advance = (step: BuildStepId, fraction = 0, detail: string | null = null) => {
+        progress = { step, fraction: overallFraction(plan, step, fraction), detail };
+      };
+      advance(plan[0]);
+      const source = cached ?? (await doDownloadVerified(await doFetchRelease(version), cacheDir, advance));
+      const { report } = await doBuildStaging({ source, staging, ghosttyPath, settingsFile, onStep: advance });
       lastReport = report;
       lastError = null;
       if (input.restart) {
         const runningExe = bundle ? join(bundle, "Contents", "MacOS", execName(bundle)) : undefined;
         doStartSwap({ staging, target, quit: true, open: true, runningExe, previousApp: bundle ?? undefined });
+        progress = { step: "restart", fraction: 1, detail: null };
+      } else {
+        progress = null;
       }
     } catch (error) {
       lastReport = reportFromError(error);
       lastError = error instanceof Error ? error.message : String(error);
+      progress = null;
     }
   }
 

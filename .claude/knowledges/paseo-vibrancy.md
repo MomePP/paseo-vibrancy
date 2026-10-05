@@ -48,7 +48,8 @@ client/                     VibrancyScreen, RangeRow, vibrancy-css.ts (CSS varia
 server/                     asar.ts, build.ts, ghostty.ts, main-hook.ts, blur.ts,
                              patch-engine.ts, patch-renderer.ts, renderer-patches.ts,
                              release.ts, status.ts, swap.ts, settings-file.ts
-shared/                     rpc.ts (zod contracts), vibrancy.ts (settings schema/defaults)
+shared/                     rpc.ts (zod contracts), vibrancy.ts (settings schema/defaults),
+                             build-progress.ts (build steps, weights, overall fraction)
 test/                       node --test
 ```
 
@@ -136,7 +137,7 @@ keeps Paseo's own settings-sync behaviour for size.
 
 | RPC | Input | Output |
 | --- | --- | --- |
-| `vibrancy.status` | — | running version, built-from version, fingerprint match, `ghosttyOverrides` (term keys the Ghostty config currently overrides), latest known release, last build report, last build error, `building` |
+| `vibrancy.status` | — | running version, built-from version, fingerprint match, `ghosttyOverrides` (term keys the Ghostty config currently overrides), latest known release, last build report, last build error, `building`, `progress` (`{ step, fraction, detail }` or `null`; see "Build is asynchronous") |
 | `vibrancy.check-update` | — | latest release `{version, zipUrl, sha512, size}` or `null`, plus an error string |
 | `vibrancy.build` | `{ version?: string, restart: boolean }` | `{ ok, report: [], error }` — returns immediately once queued (see "Build is asynchronous" below), never waits for the build itself |
 | `vibrancy.get-settings` / `vibrancy.set-settings` | settings (appearance + `terminal`) | settings |
@@ -165,7 +166,7 @@ wrong silently produces a theme that applies but reads wrong.
    entry's `sha512`/`size` out of its `files:` list (no YAML dependency — the
    format is small and fixed).
 3. Download to `~/Library/Caches/paseo-vibrancy/`, hashing while streaming
-   (zips run ~179 MB; nothing is buffered in memory). Size and base64 sha512
+   (zips run ~186 MB; nothing is buffered in memory). Size and base64 sha512
    must both match what the yml published, or the download is rejected and
    the cache dir is left exactly as found.
 4. `ditto -x -k` the zip, then
@@ -240,19 +241,53 @@ not just a version bump.
 ## Build is asynchronous (`index.server.ts`)
 
 Paseo's daemon rejects a plugin RPC that runs past its 30 s timeout. A
-rebuild from the cached pristine app takes ~21.5 s; an Update (179 MB
-download + `ditto` + `codesign --deep` verify + build) routinely blows past
-30 s. So `vibrancy.build` never awaits the build: it returns `{ok:true}` the
-instant the job is queued (or `{ok:false, error:"build already running"}`
-if one is already in flight) and the job itself runs in the background
-through `BuildQueue`. The job records its own outcome — `lastReport` and a
+rebuild from the cached pristine app takes ~4.5 s (it was ~21.5 s until the
+two synced-loader frame-rate patterns were anchored with `(?<![\w$])`;
+unanchored, each scan retried from every character of the bundle's long
+word runs); an Update (~186 MB download + `ditto` + `codesign --deep`
+verify + build) routinely blows past 30 s. So `vibrancy.build` never awaits
+the build: it returns `{ok:true}` the instant the job is queued (or
+`{ok:false, error:"build already running"}` if one is already in flight)
+and the job itself runs in the background through `BuildQueue`. The job
+records its own outcome — `lastReport` and a
 `lastError: string | null` in `vibrancy.status` — before it settles, success
 or failure, including the partial `report` `buildStaging` attaches to a
 thrown error (notes collected before the failing step). `restart: true`
 only calls `startSwap` once the build has actually succeeded.
-`client/VibrancyScreen.tsx` polls `vibrancy.status` every second while
-`building` is true, keeping the build buttons disabled, then surfaces the
-finished report or toasts `lastError`.
+
+While the job runs, `progress` in `vibrancy.status` is
+`{ step, fraction, detail }`. `BUILD_STEPS` (`shared/build-progress.ts`)
+lists the steps in run order with weights in measured seconds (download is
+network-bound and weighted 20): `download`, `extract`, `verify`, `copy`,
+`patch`, `compile`, `sign`. A rebuild from a cached pristine copy plans
+`copy`..`sign`; a build that has to download plans `download`..`sign`
+(`buildPlan`). `fraction` is overall 0..1, computed only by
+`overallFraction`: finished planned weights plus the current step's own
+fraction times its weight, over the planned total. Only the download
+reports progress inside a step (its byte fraction, `detail` like
+`"84 / 186 MB"`); every other step reports its start through
+`downloadVerified`'s `onProgress` or `buildStaging`'s `onStep`. `patch`
+covers asar, renderer, html and `pv.js`; the updater and plist edits
+(milliseconds) run after `compile` starts. Measured on beta.4: copy
+~0.3 s, patch ~1.9 s, compile ~0.7 s, sign ~1.6 s. `patchRenderer` is
+synchronous, so `vibrancy.status` cannot answer for those ~1.7 s. On
+failure, or success without restart, `progress` returns to `null`; after a
+successful `restart: true` job it stays `{ step: "restart", fraction: 1 }`,
+since the swap quits this process within about a second.
+
+`client/VibrancyScreen.tsx` polls `vibrancy.status` every 500 ms while a
+build runs. The polling is an effect keyed on `buildQueued ||
+status.building`, not a loop owned by the button handler, so reopening the
+screen mid-build picks the live bar back up from the first status fetch.
+`buildQueued` is set once `vibrancy.build` queues, so polling starts even
+before a status showing `building` has arrived (and catches a job that
+fails instantly). Build buttons and appearance controls stay disabled
+while polling. When `building` turns false it toasts `lastError`, or the
+button's success message; a screen that joined a build already running
+has none and shows "Build finished". With `progress` non-null the Build
+card shows a row above the actions: the step's label ("Restarting Paseo"
+for `restart`), `detail` as hint, and a 4 px accent bar with the
+percentage.
 
 ## Swap and restart (`server/swap.ts`)
 
@@ -394,9 +429,9 @@ update completing).
   `process.execPath` has no `.app` segment at all and `runningBundle` returns
   `null` — pass `version` explicitly to `build()` in that case.
 - **Plugin RPCs time out at 30 s.** A `vibrancy.build` call that awaited the
-  actual build (rebuild ~21.5 s, Update well over a minute) routinely got
-  killed by Paseo's daemon mid-build with no way to recover the result —
-  see "Build is asynchronous" above.
+  actual build (rebuild ~21.5 s at the time, ~4.5 s now; Update well over a
+  minute) routinely got killed by Paseo's daemon mid-build with no way to
+  recover the result — see "Build is asynchronous" above.
 - **Quit-wait must track the *running* exe, not just the target's.**
   Bootstrapping from stock `/Applications/Paseo.app`, `Paseo-Vibrancy.app`
   (the swap target) was never running, so a wait that only polled the
