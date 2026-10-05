@@ -8,11 +8,10 @@
  * `vibrancy.build` returns as soon as a build is queued (or rejects
  * immediately if one is already running) rather than waiting for it to
  * finish: Paseo's daemon rejects plugin RPCs that run past its 30 s
- * timeout, and a rebuild from cache (~21.5 s) or an Update (179 MB
- * download + ditto + `codesign --deep` verify + build) routinely exceeds
- * that. The actual work runs in the background through `queue`; its
- * outcome lands in `lastReport`/`lastError` for the client to pick up by
- * polling `vibrancy.status`.
+ * timeout, and an Update (~186 MB download + ditto + `codesign --deep`
+ * verify + build) routinely exceeds that. The actual work runs in the
+ * background through `queue`; its outcome lands in `lastReport`/`lastError`
+ * for the client to pick up by polling `vibrancy.status`.
  */
 
 import { homedir } from "node:os";

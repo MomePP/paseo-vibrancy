@@ -129,6 +129,20 @@ test("patchRenderer swaps the resize handle's accent to the subtle token in both
   assert.ok(notes.some((n) => n.startsWith("ok      subtle resize handle")));
 });
 
+test("patchRenderer patches the synced loader tick and kick behind a long word run in well under a second", () => {
+  // 80k chars took the unanchored patterns ~6 s each; anchored they take < 1 ms.
+  const src =
+    "x".repeat(80_000) +
+    ";a.value!==b&&(a.value=b),requestAnimationFrame(c);d.value=e.value,requestAnimationFrame(f)";
+  const started = performance.now();
+  const { src: patched, notes } = patchRenderer(src, DEFAULT_TERM);
+  const elapsed = performance.now() - started;
+  assert.ok(patched.endsWith(";a.value!==b&&(a.value=b),setTimeout(c,80);d.value=e.value,setTimeout(f,80)"));
+  assert.ok(notes.includes("ok      idle frame rate: synced loader tick (1x)"));
+  assert.ok(notes.includes("ok      idle frame rate: synced loader kick (1x)"));
+  assert.ok(elapsed < 1000, `took ${elapsed.toFixed(0)} ms`);
+});
+
 test("SCRIM_COLOURS.replacement is baked from PANE, not a dead placeholder", () => {
   assert.notEqual(SCRIM_COLOURS.replacement, "");
   assert.ok(String(SCRIM_COLOURS.replacement).includes(PANE));

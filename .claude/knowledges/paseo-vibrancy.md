@@ -240,12 +240,15 @@ not just a version bump.
 ## Build is asynchronous (`index.server.ts`)
 
 Paseo's daemon rejects a plugin RPC that runs past its 30 s timeout. A
-rebuild from the cached pristine app takes ~21.5 s; an Update (179 MB
-download + `ditto` + `codesign --deep` verify + build) routinely blows past
-30 s. So `vibrancy.build` never awaits the build: it returns `{ok:true}` the
-instant the job is queued (or `{ok:false, error:"build already running"}`
-if one is already in flight) and the job itself runs in the background
-through `BuildQueue`. The job records its own outcome — `lastReport` and a
+rebuild from the cached pristine app takes ~4.5 s (it was ~21.5 s until the
+two synced-loader frame-rate patterns were anchored with `(?<![\w$])`;
+unanchored, each scan retried from every character of the bundle's long
+word runs); an Update (~186 MB download + `ditto` + `codesign --deep`
+verify + build) routinely blows past 30 s. So `vibrancy.build` never awaits
+the build: it returns `{ok:true}` the instant the job is queued (or
+`{ok:false, error:"build already running"}` if one is already in flight)
+and the job itself runs in the background through `BuildQueue`. The job
+records its own outcome — `lastReport` and a
 `lastError: string | null` in `vibrancy.status` — before it settles, success
 or failure, including the partial `report` `buildStaging` attaches to a
 thrown error (notes collected before the failing step). `restart: true`
@@ -394,9 +397,9 @@ update completing).
   `process.execPath` has no `.app` segment at all and `runningBundle` returns
   `null` — pass `version` explicitly to `build()` in that case.
 - **Plugin RPCs time out at 30 s.** A `vibrancy.build` call that awaited the
-  actual build (rebuild ~21.5 s, Update well over a minute) routinely got
-  killed by Paseo's daemon mid-build with no way to recover the result —
-  see "Build is asynchronous" above.
+  actual build (rebuild ~21.5 s at the time, ~4.5 s now; Update well over a
+  minute) routinely got killed by Paseo's daemon mid-build with no way to
+  recover the result — see "Build is asynchronous" above.
 - **Quit-wait must track the *running* exe, not just the target's.**
   Bootstrapping from stock `/Applications/Paseo.app`, `Paseo-Vibrancy.app`
   (the swap target) was never running, so a wait that only polled the
