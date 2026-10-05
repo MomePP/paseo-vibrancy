@@ -274,9 +274,20 @@ synchronous, so `vibrancy.status` cannot answer for those ~1.7 s. On
 failure, or success without restart, `progress` returns to `null`; after a
 successful `restart: true` job it stays `{ step: "restart", fraction: 1 }`,
 since the swap quits this process within about a second.
-`client/VibrancyScreen.tsx` polls `vibrancy.status` every second while
-`building` is true, keeping the build buttons disabled, then surfaces the
-finished report or toasts `lastError`.
+
+`client/VibrancyScreen.tsx` polls `vibrancy.status` every 500 ms while a
+build runs. The polling is an effect keyed on `buildQueued ||
+status.building`, not a loop owned by the button handler, so reopening the
+screen mid-build picks the live bar back up from the first status fetch.
+`buildQueued` is set once `vibrancy.build` queues, so polling starts even
+before a status showing `building` has arrived (and catches a job that
+fails instantly). Build buttons and appearance controls stay disabled
+while polling. When `building` turns false it toasts `lastError`, or the
+button's success message; a screen that joined a build already running
+has none and shows "Build finished". With `progress` non-null the Build
+card shows a row above the actions: the step's label ("Restarting Paseo"
+for `restart`), `detail` as hint, and a 4 px accent bar with the
+percentage.
 
 ## Swap and restart (`server/swap.ts`)
 

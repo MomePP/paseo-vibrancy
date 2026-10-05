@@ -92,6 +92,8 @@ The **Build** card shows the running and latest Paseo versions, plus the report 
 - **Update & restart** downloads that release and rebuilds onto it.
 - **Rebuild & restart** rebuilds from the release you are already running.
 
+While an update or rebuild runs, a progress bar in the card shows the current step.
+
 A sidebar notice appears when a newer Paseo release exists, or when the plugin has changed since your copy was built.
 
 ## How it works
