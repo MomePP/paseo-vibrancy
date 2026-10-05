@@ -21,6 +21,7 @@ Paseo's window is opaque, and Electron gives plugins no way to change that. Pase
 - **Live glass**: material, blur radius, tint and main-pane glass, applied without a restart.
 - **Self-updating**: checks Paseo's GitHub releases, verifies each download against Paseo's Developer ID signature, and rebuilds the copy.
 - **Readable on glass**: menus, dialogs, toasts and the diff view stay opaque.
+- **Readable workspace title**: the workspace header title uses Medium weight instead of stock Paseo's thin Light weight.
 - **Calmer while agents run**: spinners and shimmers are stepped instead of animating every frame, which cuts WindowServer load.
 
 ## Requirements
