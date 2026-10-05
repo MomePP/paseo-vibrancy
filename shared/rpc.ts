@@ -1,6 +1,7 @@
 import { defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
 
+import { BUILD_STEPS } from "./build-progress.ts";
 import { VibrancySettingsSchema } from "./vibrancy.ts";
 
 export const ReleaseSchema = z.object({
@@ -12,6 +13,12 @@ export const ReleaseSchema = z.object({
 
 export type Release = z.infer<typeof ReleaseSchema>;
 
+export const BuildProgressSchema = z.object({
+  step: z.enum([...BUILD_STEPS.map((s) => s.id), "restart"]),
+  fraction: z.number(),
+  detail: z.string().nullable(),
+});
+
 export const VibrancyStatusSchema = z.object({
   runningVersion: z.string().nullable(),
   runningVibrancyBuild: z.boolean(),
@@ -22,6 +29,7 @@ export const VibrancyStatusSchema = z.object({
   lastReport: z.array(z.string()),
   lastError: z.string().nullable(),
   building: z.boolean(),
+  progress: BuildProgressSchema.nullable(),
 });
 
 export type VibrancyStatus = z.infer<typeof VibrancyStatusSchema>;

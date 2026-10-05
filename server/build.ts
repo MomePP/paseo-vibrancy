@@ -14,6 +14,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
+import type { BuildStepId } from "../shared/build-progress.ts";
 import { ASAR_HOOK_ANCHOR, ASAR_HOOK_LINE, patchAsar } from "./asar.ts";
 import { BLUR_CLANG_ARGS, BLUR_M, compileBlur } from "./blur.ts";
 import { fs, fsp } from "./fs.ts";
@@ -118,21 +119,25 @@ export function execName(app: string): string {
  * never leaves a half-patched copy behind; the notes collected before the
  * failure ride along as the error's `report` property, so a caller that
  * only sees the rejection (`vibrancy.build`'s background job) can still
- * surface what succeeded before the failing step.
+ * surface what succeeded before the failing step. `onStep` hears each
+ * step as it starts.
  */
 export async function buildStaging(opts: {
   source: string;
   staging?: string;
   ghosttyPath?: string;
   settingsFile?: string;
+  onStep?: (step: Extract<BuildStepId, "copy" | "patch" | "compile" | "sign">) => void;
 }): Promise<{ report: string[]; missed: boolean }> {
   const staging = opts.staging ?? DEFAULT_STAGING;
   const report: string[] = [];
 
   try {
+    opts.onStep?.("copy");
     await rm(staging, { recursive: true, force: true });
     await execFileAsync("ditto", [opts.source, staging]);
 
+    opts.onStep?.("patch");
     // 2. asar: same-length patches, hashed afterward for the Info.plist
     // integrity key Electron checks before it will load the archive.
     const asarPath = join(staging, "Contents", "Resources", "app.asar");
@@ -164,6 +169,7 @@ export async function buildStaging(opts: {
     // 4. pv.js (no note of its own — the hook it enables is the asar note
     // above) and blur.node.
     await writeFile(join(staging, "Contents", "Resources", "pv.js"), PV_JS, "utf8");
+    opts.onStep?.("compile");
     const blurNote = await compileBlur(join(staging, "Contents", "Resources", "blur.node"));
     report.push(blurNote);
 
@@ -207,6 +213,7 @@ export async function buildStaging(opts: {
     // Editing anything under Contents/ invalidates the Developer ID
     // signature, and the hardened runtime means the app will not launch
     // unsigned.
+    opts.onStep?.("sign");
     await execFileAsync("codesign", ["--force", "--deep", "--sign", "-", staging]);
 
     return { report, missed };

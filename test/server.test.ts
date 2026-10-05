@@ -8,8 +8,18 @@ import { BuildQueue, createHandlers } from "../index.server.ts";
 import { readSettings, writeSettings } from "../server/settings-file.ts";
 import { isVibrancyBuild, runningBundle } from "../server/status.ts";
 import { TERMINAL_DEFAULTS, VIBRANCY_DEFAULTS } from "../shared/vibrancy.ts";
+import { BUILD_STEPS } from "../shared/build-progress.ts";
+import type { BuildStepId } from "../shared/build-progress.ts";
 import { buildFingerprint, stampFor } from "../server/build.ts";
 import { resolveTerm } from "../server/ghostty.ts";
+
+/** Overall fraction at which `id` starts within `plan`, from the step weights. */
+function stepStart(plan: readonly BuildStepId[], id: BuildStepId): number {
+  const planned = BUILD_STEPS.filter((s) => plan.includes(s.id));
+  const total = planned.reduce((sum, s) => sum + s.weight, 0);
+  const before = planned.slice(0, planned.findIndex((s) => s.id === id));
+  return before.reduce((sum, s) => sum + s.weight, 0) / total;
+}
 
 test("writeSettings then readSettings round-trips", () => {
   const dir = mkdtempSync(join(tmpdir(), "vibrancy-file-"));
@@ -206,6 +216,122 @@ test("restart:true calls startSwap only once the build succeeds, never on failur
     await succeeding.build({ version: "1.2.3", restart: true });
     await succeeding.queue.whenIdle();
     assert.equal(swapped, true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("status reports the build step a running rebuild is in, past the previous step and short of the next", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "vibrancy-handlers-"));
+  try {
+    const { promise: pending, resolve: release } = Promise.withResolvers<void>();
+    const handlers = createHandlers({
+      settingsFile: join(dir, "paseo-vibrancy.json"),
+      execPath: "/usr/local/bin/node",
+      cachedPristine: () => join(dir, "pristine.app"),
+      buildStaging: async ({ onStep }) => {
+        onStep?.("copy");
+        onStep?.("patch");
+        await pending;
+        onStep?.("compile");
+        onStep?.("sign");
+        return { report: ["ok      fake"], missed: false };
+      },
+    });
+
+    await handlers.build({ version: "1.2.3", restart: false });
+    const { progress } = await handlers.status();
+    const plan: BuildStepId[] = ["copy", "patch", "compile", "sign"];
+    assert.equal(progress?.step, "patch");
+    assert.equal(progress.detail, null);
+    assert.ok(progress.fraction > stepStart(plan, "copy"), `${progress.fraction}`);
+    assert.ok(progress.fraction < stepStart(plan, "compile"), `${progress.fraction}`);
+
+    release();
+    await handlers.queue.whenIdle();
+    assert.equal((await handlers.status()).progress, null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("status reports download progress, weighted into the whole update, while a release downloads", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "vibrancy-handlers-"));
+  try {
+    const { promise: pending, resolve: release } = Promise.withResolvers<void>();
+    const { promise: downloading, resolve: reachedDownload } = Promise.withResolvers<void>();
+    const handlers = createHandlers({
+      settingsFile: join(dir, "paseo-vibrancy.json"),
+      execPath: "/usr/local/bin/node",
+      cachedPristine: () => null,
+      fetchRelease: async (version) => ({ version, zipUrl: "http://127.0.0.1:1/x.zip", sha512: "x", size: 186e6 }),
+      downloadVerified: async (_release, _cacheDir, onProgress) => {
+        onProgress?.("download", 0.45, "84 / 186 MB");
+        reachedDownload();
+        await pending;
+        return join(dir, "pristine.app");
+      },
+      buildStaging: async () => ({ report: ["ok      fake"], missed: false }),
+    });
+
+    await handlers.build({ version: "1.2.3", restart: false });
+    await downloading;
+    const { progress } = await handlers.status();
+    const plan: BuildStepId[] = ["download", "extract", "verify", "copy", "patch", "compile", "sign"];
+    assert.equal(progress?.step, "download");
+    assert.equal(progress.detail, "84 / 186 MB");
+    assert.ok(progress.fraction > stepStart(plan, "download"), `${progress.fraction}`);
+    assert.ok(progress.fraction < stepStart(plan, "extract"), `${progress.fraction}`);
+
+    release();
+    await handlers.queue.whenIdle();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a failed build clears progress", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "vibrancy-handlers-"));
+  try {
+    const handlers = createHandlers({
+      settingsFile: join(dir, "paseo-vibrancy.json"),
+      execPath: "/usr/local/bin/node",
+      cachedPristine: () => join(dir, "pristine.app"),
+      buildStaging: async ({ onStep }) => {
+        onStep?.("copy");
+        onStep?.("patch");
+        throw new Error("asar anchor missing");
+      },
+    });
+
+    await handlers.build({ version: "1.2.3", restart: true });
+    await handlers.queue.whenIdle();
+    const status = await handlers.status();
+    assert.equal(status.lastError, "asar anchor missing");
+    assert.equal(status.progress, null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a successful restart build leaves progress on the restart step", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "vibrancy-handlers-"));
+  try {
+    const handlers = createHandlers({
+      settingsFile: join(dir, "paseo-vibrancy.json"),
+      execPath: "/usr/local/bin/node",
+      cachedPristine: () => join(dir, "pristine.app"),
+      buildStaging: async ({ onStep }) => {
+        onStep?.("copy");
+        onStep?.("sign");
+        return { report: ["ok      fake"], missed: false };
+      },
+      startSwap: () => {},
+    });
+
+    await handlers.build({ version: "1.2.3", restart: true });
+    await handlers.queue.whenIdle();
+    assert.deepEqual((await handlers.status()).progress, { step: "restart", fraction: 1, detail: null });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -48,7 +48,8 @@ client/                     VibrancyScreen, RangeRow, vibrancy-css.ts (CSS varia
 server/                     asar.ts, build.ts, ghostty.ts, main-hook.ts, blur.ts,
                              patch-engine.ts, patch-renderer.ts, renderer-patches.ts,
                              release.ts, status.ts, swap.ts, settings-file.ts
-shared/                     rpc.ts (zod contracts), vibrancy.ts (settings schema/defaults)
+shared/                     rpc.ts (zod contracts), vibrancy.ts (settings schema/defaults),
+                             build-progress.ts (build steps, weights, overall fraction)
 test/                       node --test
 ```
 
@@ -136,7 +137,7 @@ keeps Paseo's own settings-sync behaviour for size.
 
 | RPC | Input | Output |
 | --- | --- | --- |
-| `vibrancy.status` | — | running version, built-from version, fingerprint match, `ghosttyOverrides` (term keys the Ghostty config currently overrides), latest known release, last build report, last build error, `building` |
+| `vibrancy.status` | — | running version, built-from version, fingerprint match, `ghosttyOverrides` (term keys the Ghostty config currently overrides), latest known release, last build report, last build error, `building`, `progress` (`{ step, fraction, detail }` or `null`; see "Build is asynchronous") |
 | `vibrancy.check-update` | — | latest release `{version, zipUrl, sha512, size}` or `null`, plus an error string |
 | `vibrancy.build` | `{ version?: string, restart: boolean }` | `{ ok, report: [], error }` — returns immediately once queued (see "Build is asynchronous" below), never waits for the build itself |
 | `vibrancy.get-settings` / `vibrancy.set-settings` | settings (appearance + `terminal`) | settings |
@@ -165,7 +166,7 @@ wrong silently produces a theme that applies but reads wrong.
    entry's `sha512`/`size` out of its `files:` list (no YAML dependency — the
    format is small and fixed).
 3. Download to `~/Library/Caches/paseo-vibrancy/`, hashing while streaming
-   (zips run ~179 MB; nothing is buffered in memory). Size and base64 sha512
+   (zips run ~186 MB; nothing is buffered in memory). Size and base64 sha512
    must both match what the yml published, or the download is rejected and
    the cache dir is left exactly as found.
 4. `ditto -x -k` the zip, then
@@ -253,6 +254,26 @@ records its own outcome — `lastReport` and a
 or failure, including the partial `report` `buildStaging` attaches to a
 thrown error (notes collected before the failing step). `restart: true`
 only calls `startSwap` once the build has actually succeeded.
+
+While the job runs, `progress` in `vibrancy.status` is
+`{ step, fraction, detail }`. `BUILD_STEPS` (`shared/build-progress.ts`)
+lists the steps in run order with weights in measured seconds (download is
+network-bound and weighted 20): `download`, `extract`, `verify`, `copy`,
+`patch`, `compile`, `sign`. A rebuild from a cached pristine copy plans
+`copy`..`sign`; a build that has to download plans `download`..`sign`
+(`buildPlan`). `fraction` is overall 0..1, computed only by
+`overallFraction`: finished planned weights plus the current step's own
+fraction times its weight, over the planned total. Only the download
+reports progress inside a step (its byte fraction, `detail` like
+`"84 / 186 MB"`); every other step reports its start through
+`downloadVerified`'s `onProgress` or `buildStaging`'s `onStep`. `patch`
+covers asar, renderer, html and `pv.js`; the updater and plist edits
+(milliseconds) run after `compile` starts. Measured on beta.4: copy
+~0.3 s, patch ~1.9 s, compile ~0.7 s, sign ~1.6 s. `patchRenderer` is
+synchronous, so `vibrancy.status` cannot answer for those ~1.7 s. On
+failure, or success without restart, `progress` returns to `null`; after a
+successful `restart: true` job it stays `{ step: "restart", fraction: 1 }`,
+since the swap quits this process within about a second.
 `client/VibrancyScreen.tsx` polls `vibrancy.status` every second while
 `building` is true, keeping the build buttons disabled, then surfaces the
 finished report or toasts `lastError`.
