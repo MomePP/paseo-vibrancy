@@ -373,6 +373,12 @@ export const OPAQUE_SURFACES_CSS = `
       .xterm {
         padding: __PADDING__;
       }
+      /* the workspace title is Light (300) from 720px up, which reads
+         hairline-thin against native text; Medium sits just above the
+         Regular (400) text around it */
+      [data-testid="workspace-header-title"] {
+        font-weight: 500 !important;
+      }
     </style>
 `;
 

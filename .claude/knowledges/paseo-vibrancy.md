@@ -196,7 +196,11 @@ version being built (`cachedPristine`).
    trailing scrim, kebab chip/gutter, resize handle, navigator backdrop
    (now `var(--paseo-pane-bg, transparent)`), oxocarbon ANSI, opaque-surfaces
    stylesheet (`<style id="paseo-vibrancy-opaque-surfaces">`) + xterm
-   padding, flash-guard → tint rule. The terminal metrics come from
+   padding + workspace title weight (`font-weight: 500 !important` on
+   `[data-testid="workspace-header-title"]`; stock is 300 from 720px up via
+   a unistyles media rule; font smoothing deliberately left at stock
+   `antialiased` — `auto` read as bold), flash-guard → tint rule. The
+   terminal metrics come from
    `resolveTerm(settings.terminal)` in `server/ghostty.ts`; `buildStaging`
    reads the saved settings with `readSettings(opts.settingsFile)`. The
    oxocarbon ANSI patch runs only when `terminal.ansi === "oxocarbon"`; with
