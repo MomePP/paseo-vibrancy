@@ -67,7 +67,7 @@ Applied live, without a restart.
 
 ### Terminal
 
-Terminal changes are baked into the copy, so they apply on **Rebuild & restart**. After you change one, the Build card shows "Rebuild to apply changes".
+Terminal changes are baked into the copy, so they apply on the next **Rebuild & restart** or **Update & restart**. After you change one, the Build card shows "Rebuild to apply changes".
 
 | Control | Range | Default | Effect |
 | --- | --- | --- | --- |
@@ -89,8 +89,8 @@ Oxocarbon terminal colours pair with [paseo-oxocarbon](https://github.com/MomePP
 The **Build** card shows the running and latest Paseo versions, plus the report from the last build:
 
 - **Check for updates** checks GitHub for a newer Paseo release.
-- **Update & restart** downloads that release and rebuilds onto it.
-- **Rebuild & restart** rebuilds from the release you are already running.
+- **Update & restart** appears when a newer release was found: it downloads that release and rebuilds onto it, which also applies pending terminal changes.
+- **Rebuild & restart** takes its place otherwise, rebuilding from the release you are already running.
 
 While an update or rebuild runs, a progress bar in the card shows the current step.
 

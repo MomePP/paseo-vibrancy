@@ -492,22 +492,23 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
           onPress={onCheckUpdate}
           disabled={busy || polling}
         />
-        {updateAvailable && latest && (
+        {updateAvailable && latest ? (
           <SettingsAction
             label="Update & restart"
-            hint={`Downloads and builds Paseo ${latest.version}`}
+            hint={`Builds Paseo ${latest.version}, restarts Paseo and interrupts running agents`}
             actionLabel="Update & restart"
             onPress={() => runBuild({ version: latest.version, restart: true }, `Updated to ${latest.version}`)}
             disabled={busy || polling}
           />
+        ) : (
+          <SettingsAction
+            label="Rebuild & restart"
+            hint="Restarts Paseo and interrupts running agents"
+            actionLabel="Rebuild & restart"
+            onPress={() => runBuild({ restart: true }, "Rebuilt the Vibrancy copy")}
+            disabled={busy || polling}
+          />
         )}
-        <SettingsAction
-          label="Rebuild & restart"
-          hint="Restarts Paseo and interrupts running agents"
-          actionLabel="Rebuild & restart"
-          onPress={() => runBuild({ restart: true }, "Rebuilt the Vibrancy copy")}
-          disabled={busy || polling}
-        />
       </SettingsCard>
     </SettingsSection>
   );
