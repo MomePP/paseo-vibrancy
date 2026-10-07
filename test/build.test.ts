@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { buildFingerprint, buildStaging, serialiseFingerprintInputs, stampFor } from "../server/build.ts";
+import { appVersion, buildFingerprint, buildStaging, serialiseFingerprintInputs, stampFor } from "../server/build.ts";
 import { resolveTerm } from "../server/ghostty.ts";
 import type { TermMetrics } from "../server/ghostty.ts";
 import { writeSettings } from "../server/settings-file.ts";
@@ -106,7 +106,7 @@ async function realBuild(settings: { terminal: Partial<TerminalSettings> } | nul
     assert.equal(existsSync(join(staging, "Contents", "Resources", "blur.node")), true);
 
     const stamp = readFileSync(join(staging, "Contents", "Resources", ".vibrancy-build"), "utf8");
-    assert.match(stamp, /^0\.11\.0-beta\.3\|vibrancy=/);
+    assert.ok(stamp.startsWith(`${appVersion(pristine!)}|vibrancy=`), stamp);
     return { report, stamp };
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -114,7 +114,7 @@ async function realBuild(settings: { terminal: Partial<TerminalSettings> } | nul
 }
 
 test(
-  "builds pristine beta.3 cleanly",
+  "builds a pristine release cleanly",
   { skip: pristine ? false : "set VIBRANCY_PRISTINE=<path to a verified pristine Paseo.app> to run" },
   async () => {
     const { report } = await realBuild(null);
@@ -123,7 +123,7 @@ test(
 );
 
 test(
-  "builds pristine beta.3 cleanly with the stock palette and non-default terminal metrics",
+  "builds a pristine release cleanly with the stock palette and non-default terminal metrics",
   { skip: pristine ? false : "set VIBRANCY_PRISTINE=<path to a verified pristine Paseo.app> to run" },
   async () => {
     const { report } = await realBuild({

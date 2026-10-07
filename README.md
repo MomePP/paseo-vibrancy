@@ -5,7 +5,7 @@
 **A frosted-glass Paseo for macOS, rebuilt and kept up to date from inside the app.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-161616?style=flat-square&labelColor=262626)](LICENSE)
-[![Paseo](https://img.shields.io/badge/paseo-%E2%89%A50.11.0--beta.3-161616?style=flat-square&labelColor=262626)](https://paseo.sh)
+[![Paseo](https://img.shields.io/badge/paseo-%E2%89%A50.11.0-161616?style=flat-square&labelColor=262626)](https://paseo.sh)
 [![macOS](https://img.shields.io/badge/macOS-Apple%20silicon-161616?style=flat-square&labelColor=262626)](#requirements)
 
 <img src="docs/hero.png" alt="paseo-vibrancy with paseo-oxocarbon: frosted-glass sidebar and main pane over the desktop" width="100%">
@@ -27,7 +27,7 @@ Paseo's window is opaque, and Electron gives plugins no way to change that. Pase
 ## Requirements
 
 - macOS on Apple silicon
-- [Paseo](https://paseo.sh) 0.11.0-beta.3 or later, with **Settings > Plugins > Enable plugins** on
+- [Paseo](https://paseo.sh) 0.11.0 or later, with **Settings > Plugins > Enable plugins** on
 - Xcode Command Line Tools (`xcode-select --install`) for the blur radius; without them, the Apple materials still work
 
 ## Install
