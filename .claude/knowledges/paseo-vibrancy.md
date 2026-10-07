@@ -40,7 +40,7 @@ identifier "sh.paseo.desktop" and anchor apple generic and certificate 1[field.1
 ## Layout
 
 ```text
-paseo-plugin.json          { "id": "paseo-vibrancy", "requirements": { "paseo": ">=0.11.0-beta.3" } }
+paseo-plugin.json          { "id": "paseo-vibrancy", "requirements": { "paseo": ">=0.11.0" } }
 package.json, tsconfig.json
 index.client.tsx            settings screen contribution (renderer)
 index.server.ts             registers the five RPC handlers (daemon subprocess)
