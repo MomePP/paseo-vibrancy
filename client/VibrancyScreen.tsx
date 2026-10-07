@@ -250,7 +250,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
     <SettingsSection title="Appearance">
       <SettingsCard>
         {!runningVibrancyBuild && (
-          <SettingsRow label="Not running the Vibrancy build" hint="Rebuild below to enable live appearance controls." />
+          <SettingsRow label="Not running the Vibrancy build" hint="Build below to enable live appearance controls." />
         )}
         <SettingsSelect
           label="Material"

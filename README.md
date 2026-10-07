@@ -47,7 +47,7 @@ paseo plugin install github:MomePP/paseo-vibrancy
 ## Build your copy
 
 1. Open **Settings > Plugins**, then `...` next to **paseo-vibrancy**, then **Vibrancy**.
-2. Press **Rebuild & restart**. The build takes under a minute; the first one also downloads Paseo, about 180 MB. Paseo then quits, and the copy opens on its own.
+2. Press **Rebuild & restart**, or **Update & restart** if a newer Paseo release is out. The build takes under a minute; the first one also downloads Paseo, about 180 MB. Paseo then quits, and the copy opens on its own.
 3. From now on, launch **Paseo-Vibrancy** instead of Paseo. Both share the same data, so only run one at a time.
 
 Rebuilding restarts Paseo's daemon, which interrupts any running agents.
