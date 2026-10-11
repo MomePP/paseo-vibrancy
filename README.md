@@ -94,7 +94,7 @@ The **Build** card shows the running and latest Paseo versions, plus the report 
 
 While an update or rebuild runs, a progress bar in the card shows the current step.
 
-A sidebar notice appears when a newer Paseo release exists, or when the plugin has changed since your copy was built.
+A sidebar notice appears when a newer Paseo release exists, or when the plugin has changed since your copy was built. The plugin checks at launch and then every hour, so a release published while Paseo stays open still shows up.
 
 ## How it works
 
