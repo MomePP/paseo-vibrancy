@@ -21,6 +21,9 @@ export const MATERIALS = [
 export const CURSOR_STYLES = ["bar", "block", "underline"] as const;
 export const ANSI_PALETTES = ["oxocarbon", "paseo"] as const;
 
+/** Global the client plugin sets and the patched renderer reads at call time. */
+export const OPEN_FILES_IN_NEW_TAB_GLOBAL = "__paseoOpenFilesInNewTab";
+
 export const TERMINAL_DEFAULTS = {
   followGhostty: true,
   fontSize: 13.5,
@@ -37,6 +40,7 @@ export const VIBRANCY_DEFAULTS = {
   blurRadius: 30,
   tint: 0.85,
   paneGlass: true,
+  openFilesInNewTab: false,
   terminal: TERMINAL_DEFAULTS,
 } as const;
 
@@ -89,6 +93,7 @@ export const VibrancySettingsSchema = z.object({
     .catch(VIBRANCY_DEFAULTS.tint)
     .transform((value) => Math.min(1, Math.max(0, value))),
   paneGlass: z.boolean().catch(VIBRANCY_DEFAULTS.paneGlass),
+  openFilesInNewTab: z.boolean().catch(VIBRANCY_DEFAULTS.openFilesInNewTab),
   // Missing or non-object `terminal` fails the object parse and lands on the
   // defaults; each field inside falls back on its own.
   terminal: TerminalSettingsSchema.catch({ ...TERMINAL_DEFAULTS }),

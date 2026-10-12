@@ -1,10 +1,11 @@
 /**
- * Maps `VibrancySettings` to the two CSS custom properties the patched
- * renderer's stylesheet reads (see `server/renderer-patches.ts`), and
- * applies them live so Settings changes show immediately without a reload.
+ * Applies the settings the patched renderer reads live, so Settings changes
+ * show immediately without a reload: the two CSS custom properties its
+ * stylesheet reads, and the global flag its file-tab reuse guard reads (see
+ * `server/renderer-patches.ts`).
  */
 
-import type { VibrancySettings } from "../shared/vibrancy.ts";
+import { OPEN_FILES_IN_NEW_TAB_GLOBAL, type VibrancySettings } from "../shared/vibrancy.ts";
 
 export type VibrancyCssVars = {
   "--paseo-tint": string;
@@ -29,8 +30,9 @@ interface StyleHost {
   documentElement: { style: { setProperty(name: string, value: string): void } };
 }
 
-/** No-op off the web (mobile/native has no `document`). */
-export function applyVibrancyCss(settings: VibrancySettings): void {
+/** The CSS half is a no-op off the web (mobile/native has no `document`). */
+export function applyLiveSettings(settings: VibrancySettings): void {
+  (globalThis as Record<string, unknown>)[OPEN_FILES_IN_NEW_TAB_GLOBAL] = settings.openFilesInNewTab;
   if (!("document" in globalThis)) {
     return;
   }

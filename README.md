@@ -19,6 +19,7 @@ Paseo's window is opaque, and Electron gives plugins no way to change that. Pase
 ## Features
 
 - **Live glass**: material, blur radius, tint and main-pane glass, applied without a restart.
+- **Open files in a new tab**: optionally keep Files and Changes from replacing the focused file tab.
 - **Self-updating**: checks Paseo's GitHub releases, verifies each download against Paseo's Developer ID signature, and rebuilds the copy.
 - **Readable on glass**: menus, dialogs, toasts and the diff view stay opaque.
 - **Readable workspace title**: the workspace header title uses Medium weight instead of stock Paseo's thin Light weight.
@@ -64,6 +65,14 @@ Applied live, without a restart.
 | Blur radius | 0 - 60 | 30 | Background blur behind the window, used when Material is `none`. |
 | Tint | 0 - 100% | 85% | How much of the theme colour washes over the blur. |
 | Main pane glass | on / off | on | Extends the glass behind chats and editors; off keeps the main pane solid. |
+
+### Tabs
+
+Applied live, without a restart. The first build after updating the plugin is needed to carry the patch this toggle relies on.
+
+| Control | Range | Default | Effect |
+| --- | --- | --- | --- |
+| Open files in a new tab | on / off | off | Clicking a file in Files, or opening one from Changes, always opens a new tab instead of replacing the focused unmodified file tab. Off keeps stock Paseo behaviour. |
 
 ### Terminal
 

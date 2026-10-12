@@ -11,6 +11,8 @@
  * patch always runs unconditionally.
  */
 
+import { OPEN_FILES_IN_NEW_TAB_GLOBAL } from "../shared/vibrancy.ts";
+
 type TableReplacer = string | ((...match: string[]) => string);
 
 export type RendererPatch = { label: string; old: string; replacement: string; expect: number };
@@ -154,6 +156,19 @@ export const HANDLE_HIGHLIGHT: ExpectedReTableEntry = {
   pattern:
     /\[([A-Za-z_$][\w$]*)\.highlight,"horizontal"===([A-Za-z_$][\w$]*)\?\1\.highlightHorizontal:\1\.highlightVertical,\{backgroundColor:([A-Za-z_$][\w$]*)\.colors\.accent\}\],\[\2,\3\.colors\.accent\]/g,
   replacement: `[$1.highlight,"horizontal"===$2?$1.highlightHorizontal:$1.highlightVertical,{backgroundColor:$3.colors.${HANDLE_HIGHLIGHT_TOKEN}}],[$2,$3.colors.${HANDLE_HIGHLIGHT_TOKEN}]`,
+  expect: 1,
+};
+
+// Upstream's `canReplacePreview` (workspace-tabs/open-beside.ts) lets a file
+// open replace the focused unmodified file tab. The guard reads a global at
+// call time instead of baking the setting in, so the toggle is live: the client
+// plugin sets the flag, and with the plugin off it is undefined, which leaves
+// stock behaviour. The pattern captures the options ident so the replacement
+// can rebuild the whole match as a plain string for the build fingerprint.
+export const FILE_TAB_REUSE: ExpectedReTableEntry = {
+  label: "file tab reuse guard",
+  pattern: /"file"===([A-Za-z_$][\w$]*)\.nextTarget\.kind&&"file"===\1\.currentTarget\.kind&&/g,
+  replacement: `"file"===$1.nextTarget.kind&&!globalThis.${OPEN_FILES_IN_NEW_TAB_GLOBAL}&&"file"===$1.currentTarget.kind&&`,
   expect: 1,
 };
 
@@ -403,6 +418,7 @@ export const BUILD_TABLES = {
   KEBAB_GUTTER,
   HANDLE_HIGHLIGHT_TOKEN,
   HANDLE_HIGHLIGHT,
+  FILE_TAB_REUSE,
   WINDOW_CHROME_PAYLOAD,
   ALPHA_HELPER,
   SURFACE_PATCHES,
