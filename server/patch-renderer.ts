@@ -14,6 +14,7 @@ import {
   BACKDROP_MASKS,
   DIFF_PALETTE,
   FRAME_RATE,
+  FILE_TAB_REUSE,
   HANDLE_HIGHLIGHT,
   HOVER_HIGHLIGHT,
   HTML_FLASH_GUARD,
@@ -145,6 +146,7 @@ export function patchRenderer(src: string, term: TermMetrics): { src: string; no
     HANDLE_HIGHLIGHT.replacement,
     HANDLE_HIGHLIGHT.expect,
   );
+  patcher.replaceRe(FILE_TAB_REUSE.label, FILE_TAB_REUSE.pattern, FILE_TAB_REUSE.replacement, FILE_TAB_REUSE.expect);
 
   return { src: patcher.src, notes: patcher.notes };
 }

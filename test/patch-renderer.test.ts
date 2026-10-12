@@ -143,6 +143,52 @@ test("patchRenderer patches the synced loader tick and kick behind a long word r
   assert.ok(elapsed < 1000, `took ${elapsed.toFixed(0)} ms`);
 });
 
+function fileTabReuseFn(o: string): string {
+  return (
+    `function c(${o}){return"working_diff"===${o}.nextTarget.kind?"working_diff"===${o}.currentTarget.kind:` +
+    `"file"===${o}.nextTarget.kind&&"file"===${o}.currentTarget.kind&&` +
+    `!(0,n.getPanelInstanceAttributes)({serverId:${o}.serverId,workspaceId:${o}.workspaceId,tabId:${o}.tabId}).modified}`
+  );
+}
+
+function canReplace(fnText: string, target: { nextTarget: string; currentTarget: string }): boolean {
+  const build = new Function(
+    "n",
+    `${fnText};return c;`,
+  ) as (n: { getPanelInstanceAttributes: () => { modified: boolean } }) => (o: unknown) => boolean;
+  const fn = build({ getPanelInstanceAttributes: () => ({ modified: false }) });
+  return fn({
+    nextTarget: { kind: target.nextTarget },
+    currentTarget: { kind: target.currentTarget },
+    serverId: "s",
+    workspaceId: "w",
+    tabId: "t",
+  });
+}
+
+test("patchRenderer's file tab reuse guard follows the global flag at call time", () => {
+  const flags = globalThis as Record<string, unknown>;
+  const { src, notes } = patchRenderer(fileTabReuseFn("q"), DEFAULT_TERM);
+  assert.ok(notes.includes("ok      file tab reuse guard (1x)"));
+  const fileToFile = { nextTarget: "file", currentTarget: "file" };
+  const diffToDiff = { nextTarget: "working_diff", currentTarget: "working_diff" };
+  try {
+    delete flags.__paseoOpenFilesInNewTab;
+    assert.equal(canReplace(src, fileToFile), true);
+    assert.equal(canReplace(src, diffToDiff), true);
+    flags.__paseoOpenFilesInNewTab = true;
+    assert.equal(canReplace(src, fileToFile), false);
+    assert.equal(canReplace(src, diffToDiff), true);
+  } finally {
+    delete flags.__paseoOpenFilesInNewTab;
+  }
+});
+
+test("patchRenderer records a MISSED note for the file tab reuse guard when its anchor is absent", () => {
+  const { notes } = patchRenderer("var x=1;", DEFAULT_TERM);
+  assert.ok(notes.some((n) => n.startsWith("MISSED") && n.includes("file tab reuse guard")));
+});
+
 test("SCRIM_COLOURS.replacement is baked from PANE, not a dead placeholder", () => {
   assert.notEqual(SCRIM_COLOURS.replacement, "");
   assert.ok(String(SCRIM_COLOURS.replacement).includes(PANE));
