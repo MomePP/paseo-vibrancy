@@ -71,10 +71,12 @@ Schema lives in `shared/vibrancy.ts`, persisted by the server to
             | "window" | "content" | "under-page" | "selection" | "tooltip",
   blurRadius: number,   // 0–60, used when material is "none"
   tint: number,         // 0–1
-  paneGlass: boolean }
+  paneGlass: boolean,
+  openFilesInNewTab: boolean }  // plus `terminal`, see below
 ```
 
-Defaults: `{ material: "none", blurRadius: 30, tint: 0.85, paneGlass: true }`.
+Defaults: `{ material: "none", blurRadius: 30, tint: 0.85, paneGlass: true,
+openFilesInNewTab: false }`.
 
 - **Main process (`pv.js`).** Loaded by the asar window-options hook line
   `transparent:require(process.resourcesPath+"/pv.js"),visualEffectState:"active",`
@@ -95,11 +97,19 @@ Defaults: `{ material: "none", blurRadius: 30, tint: 0.85, paneGlass: true }`.
     `background-color: color-mix(in srgb, var(--colors-surface1, <stock hex>) calc(var(--paseo-tint, <default>) * 100%), transparent);`
   - `--paseo-pane-bg` — `transparent` when `paneGlass`, else
     `var(--colors-surface1)`; consumed by the navigator backdrop patch.
+
+  It also sets `globalThis.__paseoOpenFilesInNewTab`
+  (`OPEN_FILES_IN_NEW_TAB_GLOBAL`) to `openFilesInNewTab`, before the
+  `document` check. The renderer's `canReplacePreview` (file branch) is
+  patched unconditionally to read that global at call time, so the toggle is
+  live; plugin disabled ⇒ flag undefined ⇒ stock behaviour. The first build
+  after updating the plugin is needed to carry the patch.
 - **Vibrancy screen** (`addSettingsScreen({ id: "vibrancy", title: "Vibrancy", … })`):
-  three sections. Appearance: Material (`SettingsSelect`), Blur radius and Tint
+  four sections. Appearance: Material (`SettingsSelect`), Blur radius and Tint
   (styled `<input type="range">`), Main pane glass (`SettingsSwitch`); every
   change calls `setSettings`, tint/pane apply locally at once rather than
-  waiting on the round trip. Terminal: the settings below (range rows fall
+  waiting on the round trip. Tabs: Open files in a new tab (`SettingsSwitch`,
+  disabled like the Appearance controls). Terminal: the settings below (range rows fall
   back to selects off web); rows Ghostty overrides are disabled and hinted
   "Set by Ghostty config". Build: versions, report, actions, and "Rebuild to
   apply changes" when `runningVibrancyBuild && !fingerprintMatches`. Saving
@@ -194,7 +204,9 @@ version being built (`cachedPristine`).
    surface alphas, window chrome payload, terminal metrics + sync, diff
    palette, overlay surfaces (annotate card, toast pill), frame-rate
    stepping, readable surface0 foregrounds, hover fills, backdrop masks,
-   trailing scrim, kebab chip/gutter, resize handle, navigator backdrop
+   trailing scrim, kebab chip/gutter, resize handle, file tab reuse guard
+   (`"file"===…nextTarget.kind&&!globalThis.__paseoOpenFilesInNewTab&&…`),
+   navigator backdrop
    (now `var(--paseo-pane-bg, transparent)`), oxocarbon ANSI, opaque-surfaces
    stylesheet (`<style id="paseo-vibrancy-opaque-surfaces">`) + xterm
    padding + workspace title weight (`font-weight: 500 !important` on

@@ -66,3 +66,10 @@ test("parseVibrancy falls back per field for bad terminal enums and booleans", (
   assert.equal(t.followGhostty, true);
   assert.equal(t.paddingLeft, 4);
 });
+
+test("parseVibrancy reads openFilesInNewTab, defaulting to false for missing or non-boolean values", () => {
+  assert.equal(parseVibrancy({}).openFilesInNewTab, false);
+  assert.equal(parseVibrancy({ openFilesInNewTab: true }).openFilesInNewTab, true);
+  assert.equal(parseVibrancy({ openFilesInNewTab: "yes" }).openFilesInNewTab, false);
+  assert.equal(parseVibrancy({ openFilesInNewTab: 1 }).openFilesInNewTab, false);
+});

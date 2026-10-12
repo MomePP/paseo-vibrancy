@@ -310,6 +310,20 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
     </SettingsSection>
   );
 
+  const tabsSection = (
+    <SettingsSection title="Tabs">
+      <SettingsCard>
+        <SettingsSwitch
+          label="Open files in a new tab"
+          hint="Files and Changes never replace the focused file tab"
+          value={settings.openFilesInNewTab}
+          onValueChange={(openFilesInNewTab) => updateSettings({ ...settings, openFilesInNewTab })}
+          disabled={appearanceDisabled}
+        />
+      </SettingsCard>
+    </SettingsSection>
+  );
+
   const terminal = settings.terminal;
   const terminalDisabled = !settingsLoaded;
   const overridden = new Set(terminal.followGhostty ? (status?.ghosttyOverrides ?? []) : []);
@@ -516,6 +530,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
   return (
     <>
       {appearanceSection}
+      {tabsSection}
       {terminalSection}
       {buildSection}
     </>
