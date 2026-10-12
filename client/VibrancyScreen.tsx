@@ -32,7 +32,7 @@ import type { VibrancySettings } from "../shared/vibrancy.ts";
 import { buildRpc, checkUpdateRpc, getSettingsRpc, setSettingsRpc, statusRpc } from "../shared/rpc.ts";
 import type { VibrancyStatus } from "../shared/rpc.ts";
 import { compareVersions } from "../shared/version.ts";
-import { applyVibrancyCss } from "./vibrancy-css.ts";
+import { applyLiveSettings } from "./live-settings.ts";
 import RangeRow from "./RangeRow.tsx";
 
 const SET_SETTINGS_DEBOUNCE_MS = 150;
@@ -105,7 +105,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
       .then((loaded) => {
         setSettings(loaded);
         setSettingsLoaded(true);
-        applyVibrancyCss(loaded);
+        applyLiveSettings(loaded);
       })
       .catch((error: unknown) => {
         toast.error(error instanceof Error ? error.message : "Failed to load Vibrancy settings");
@@ -127,7 +127,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
 
   function updateSettings(next: VibrancySettings) {
     setSettings(next);
-    applyVibrancyCss(next);
+    applyLiveSettings(next);
     pendingRef.current = next;
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {

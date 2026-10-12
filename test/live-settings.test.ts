@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { VIBRANCY_DEFAULTS } from "../shared/vibrancy.ts";
-import { vibrancyCssVars } from "../client/vibrancy-css.ts";
+import { vibrancyCssVars } from "../client/live-settings.ts";
 
 test("vibrancyCssVars maps defaults to a plain tint string and a transparent pane", () => {
   assert.deepEqual(vibrancyCssVars({ ...VIBRANCY_DEFAULTS }), {

@@ -30,7 +30,7 @@ interface StyleHost {
 }
 
 /** No-op off the web (mobile/native has no `document`). */
-export function applyVibrancyCss(settings: VibrancySettings): void {
+export function applyLiveSettings(settings: VibrancySettings): void {
   if (!("document" in globalThis)) {
     return;
   }

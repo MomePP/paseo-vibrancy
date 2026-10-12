@@ -11,7 +11,7 @@ import type { PluginCleanup } from "@getpaseo/plugin";
 import { ScrollView } from "@getpaseo/plugin/client/react-native";
 
 import { getSettingsRpc } from "./shared/rpc.ts";
-import { applyVibrancyCss } from "./client/vibrancy-css.ts";
+import { applyLiveSettings } from "./client/live-settings.ts";
 import { watchUpdateNotice } from "./client/update-notice.ts";
 import VibrancyScreen from "./client/VibrancyScreen.tsx";
 
@@ -42,7 +42,7 @@ export default function contribute(client: PluginClientContext): PluginCleanup {
     .rpc(getSettingsRpc, {})
     .then((settings) => {
       if (!disposed) {
-        applyVibrancyCss(settings);
+        applyLiveSettings(settings);
       }
     })
     .catch((error: unknown) => {

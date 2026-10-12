@@ -44,7 +44,7 @@ paseo-plugin.json          { "id": "paseo-vibrancy", "requirements": { "paseo": 
 package.json, tsconfig.json
 index.client.tsx            settings screen contribution (renderer)
 index.server.ts             registers the five RPC handlers (daemon subprocess)
-client/                     VibrancyScreen, RangeRow, vibrancy-css.ts (CSS variable applier)
+client/                     VibrancyScreen, RangeRow, live-settings.ts (CSS variable applier)
 server/                     asar.ts, build.ts, ghostty.ts, main-hook.ts, blur.ts,
                              patch-engine.ts, patch-renderer.ts, renderer-patches.ts,
                              release.ts, status.ts, swap.ts, settings-file.ts
@@ -89,7 +89,7 @@ Defaults: `{ material: "none", blurRadius: 30, tint: 0.85, paneGlass: true }`.
   `"none"`: `win.setVibrancy(null)` and `blur.setBlur(handle, blurRadius)`.
   Every `apply` also calls `blur.matchCorners(handle)` (see the corners
   gotcha below).
-- **Renderer (`client/vibrancy-css.ts`).** On load and on every change, sets on
+- **Renderer (`client/live-settings.ts`).** On load and on every change, sets on
   `document.documentElement`:
   - `--paseo-tint` — consumed by the body wash rule:
     `background-color: color-mix(in srgb, var(--colors-surface1, <stock hex>) calc(var(--paseo-tint, <default>) * 100%), transparent);`
