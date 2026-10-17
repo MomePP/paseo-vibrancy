@@ -173,6 +173,30 @@ export const TAB_GLASS: ExpectedReTableEntry[] = [
   },
 ];
 
+// Sidebar row meta line: branch, PR, checks, services and workspace labels
+// all share one row, so a long branch and a label chip squeeze each other
+// into `feature/ardu…` and `devel…`. The labels get a line of their own
+// under the rest; the row itself only has a minHeight, so it grows to fit.
+// `WorkspaceMetaRow`'s single `row` View becomes a column holding the
+// original row (every item except labels, still `·`-separated) and one row
+// per labels item, which is `leading` there so its chip inset lines up with
+// the branch icon. Captures every minified name so the rewrite only touches
+// the item map and the container style.
+export const LABELS_LINE: ExpectedReTableEntry = {
+  label: "workspace labels on their own line",
+  pattern: new RegExp(
+    String.raw`(\w)=(\w)\.View,(\w)=([\w$]+)\.row,(\w)\[12\]!==(\w)\?\((\w)=\((\w),(\w)\)=>\(0,(\w)\.jsxs\)\((\w)\.Fragment,\{children:\[\9>0\?\(0,\10\.jsx\)\((\w)\.Text,\{style:\4\.separator,children:"\\xb7"\}\):null,\(0,\10\.jsx\)\((\w),\{item:\8,hostBadge:\6,leading:0===\9\}\)\]\},\8\.kind\),\5\[12\]=\6,\5\[13\]=\7\):\7=\5\[13\],(\w)=(\w)\.map\(\7\)`,
+    "g",
+  ),
+  replacement:
+    '$1=$2.View,$3={flexDirection:"column",gap:2,minWidth:0},' +
+    '$5[12]!==$6?($7=($8,$9)=>(0,$10.jsxs)($11.Fragment,{children:[$9>0?(0,$10.jsx)($12.Text,{style:$4.separator,children:"\\xb7"}):null,' +
+    "(0,$10.jsx)($13,{item:$8,hostBadge:$6,leading:0===$9})]},$8.kind),$5[12]=$6,$5[13]=$7):$7=$5[13]," +
+    '$14=[(0,$10.jsx)($2.View,{style:$4.row,children:$15.filter(__pv=>"labels"!==__pv.kind).map($7)},"meta"),' +
+    '...$15.filter(__pv=>"labels"===__pv.kind).map(__pv=>(0,$10.jsx)($2.View,{style:$4.row,children:(0,$10.jsx)($13,{item:__pv,hostBadge:$6,leading:!0})},__pv.kind))]',
+  expect: 1,
+};
+
 // The pane resize handle's hover/drag highlight: oxocarbon's accent is a
 // bright purple that lights up a full-height bar on every pointer crossing.
 // `surface4` (ring) is one clear step above resting `border` with no hue, so
@@ -472,6 +496,7 @@ export const BUILD_TABLES = {
   KEBAB_CHIP,
   KEBAB_GUTTER_PX,
   KEBAB_GUTTER,
+  LABELS_LINE,
   TAB_GLASS,
   HANDLE_HIGHLIGHT_TOKEN,
   HANDLE_HIGHLIGHT,
