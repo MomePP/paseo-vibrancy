@@ -22,6 +22,7 @@ import {
   INK_SURFACE0,
   KEBAB_CHIP,
   KEBAB_GUTTER,
+  LABELS_LINE,
   NAVIGATOR_BACKDROP,
   OPAQUE_SURFACES_CSS,
   OVERLAY_SURFACES,
@@ -141,6 +142,7 @@ export function patchRenderer(src: string, term: TermMetrics): { src: string; no
   patcher.replaceRe(SCRIM_COLOURS.label, SCRIM_COLOURS.pattern, SCRIM_COLOURS.replacement, SCRIM_COLOURS.expect);
   patcher.sweepRe(KEBAB_CHIP.label, KEBAB_CHIP.pattern, KEBAB_CHIP.replacement);
   patcher.replaceRe(KEBAB_GUTTER.label, KEBAB_GUTTER.pattern, KEBAB_GUTTER.replacement, KEBAB_GUTTER.expect);
+  patcher.replaceRe(LABELS_LINE.label, LABELS_LINE.pattern, LABELS_LINE.replacement, LABELS_LINE.expect);
   for (const { label, pattern, replacement, expect } of TAB_GLASS) {
     patcher.replaceRe(label, pattern, replacement, expect);
   }
