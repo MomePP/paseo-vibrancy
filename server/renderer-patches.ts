@@ -336,12 +336,15 @@ export const DIFF_PALETTE: ReTableEntry[] = [
   },
 ];
 
-// Floating surfaces are glass like the workspace: the theme's popover colour
-// at the window's tint (the same `--paseo-tint` the body wash uses, so the
-// Tint slider moves both), over a blur of whatever sits behind the surface so
-// text under a menu or dialog never shows through legibly. Defined once on
-// `:root` by OPAQUE_SURFACES_CSS; react-native-web passes a colour through
-// untouched only when it starts with `var(`, so inline styles use the var.
+// Floating surfaces are glass like the workspace and fill like a hovered
+// sidebar row: the theme's `interactionHighlight` (white 8% on dark themes)
+// over the same body wash, so a hover card reads as the row it came from.
+// A blur of whatever sits behind the surface keeps text under a menu or
+// dialog from showing through legibly. Defined once on `:root` by
+// OPAQUE_SURFACES_CSS; Unistyles names the theme var by hyphenating the key
+// (`--colors-interaction-highlight`), with the dark value as fallback.
+// react-native-web passes a colour through untouched only when it starts
+// with `var(`, so inline styles use the var.
 const POPUP_BG = "var(--paseo-popup-bg)";
 const POPUP_BLUR = "blur(24px) saturate(1.4)";
 
@@ -458,7 +461,7 @@ export const OPAQUE_SURFACES_CSS = `
       /* added by paseo-vibrancy: floating surfaces are glass, blurred so
          what is behind them stays unreadable */
       :root {
-        --paseo-popup-bg: color-mix(in srgb, var(--colors-popover) calc(var(--paseo-tint, 0.85) * 100%), transparent);
+        --paseo-popup-bg: var(--colors-interaction-highlight, rgba(255, 255, 255, 0.08));
       }
       [aria-modal="true"],
       [role="menu"],
