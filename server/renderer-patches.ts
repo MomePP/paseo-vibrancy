@@ -342,11 +342,11 @@ export const DIFF_PALETTE: ReTableEntry[] = [
 // strong blur keeps text under a menu or dialog from showing through
 // legibly.
 //
-// The user's message bubble and the composer are frosted instead: the
-// theme's `surface2` (oxocarbon base01) at 55%, darker than the hover white,
-// over a light blur, so chat text scrolling under the composer shows as
-// soft shapes rather than a flat grey slab (a 24px blur under a white tint
-// read as opaque).
+// The user's message bubble, the composer and the pills above it (the diff
+// stat chip) are frosted instead: the theme's `surface2` (oxocarbon base01)
+// at 35%, darker than the hover white, over a light blur, so chat text
+// scrolling under the composer shows as soft shapes rather than a flat grey
+// slab (a 24px blur under a white tint read as opaque; 55% still too solid).
 //
 // Both are defined once on `:root` by OPAQUE_SURFACES_CSS. Unistyles names a
 // theme var by hyphenating the key (`--colors-interaction-highlight`); the
@@ -355,12 +355,13 @@ export const DIFF_PALETTE: ReTableEntry[] = [
 const GLASS_FILL = "var(--paseo-glass-fill)";
 const GLASS_BLUR = "blur(24px) saturate(1.4)";
 const FROST_FILL = "var(--paseo-frost-fill)";
-const FROST_BLUR = "blur(8px) saturate(1.2)";
+const FROST_BLUR = "blur(5px) saturate(1.2)";
 
 // Surfaces with no ARIA role or test id, reachable only at the style object:
 // the browser pane's "Annotate element" card, the toast pill, the user's
-// message bubble (stock `surface3`, a solid slab) and the composer box
-// (stock `surface1`).
+// message bubble (stock `surface3`, a solid slab), the composer box (stock
+// `surface1`) and the composer pills (`composerPillStyles`, stock `surface1`
+// with an opaque `surface2` hover, now the shared hover fill).
 export const GLASS_SURFACES: ReTableEntry[] = [
   {
     label: "glass annotate card",
@@ -382,6 +383,12 @@ export const GLASS_SURFACES: ReTableEntry[] = [
     pattern:
       /(inputWrapper:Object\.assign\(\{flexShrink:1,flexDirection:"column",gap:[A-Za-z_$][\w$]*\.spacing\[3\],backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1/g,
     replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}"`,
+  },
+  {
+    label: "glass composer pill",
+    pattern:
+      /(body:\{flexDirection:"row",alignItems:"center",gap:([A-Za-z_$][\w$]*)\.spacing\[2\],minHeight:[\w$]+,paddingHorizontal:\2\.spacing\[3\],paddingVertical:\2\.spacing\[1\],borderRadius:\2\.borderRadius\["2xl"\],borderWidth:\2\.borderWidth\[1\],borderColor:\2\.colors\.borderAccent,backgroundColor:)\2\.colors\.surface1(,uni__dependencies:\[0\]\},bodyActive:\{backgroundColor:)\2\.colors\.surface2/g,
+    replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}"$3"${GLASS_FILL}"`,
   },
 ];
 
@@ -483,7 +490,7 @@ export const OPAQUE_SURFACES_CSS = `
          what is behind them stays unreadable */
       :root {
         --paseo-glass-fill: var(--colors-interaction-highlight, rgba(255, 255, 255, 0.08));
-        --paseo-frost-fill: color-mix(in srgb, var(--colors-surface2, #262626) 55%, transparent);
+        --paseo-frost-fill: color-mix(in srgb, var(--colors-surface2, #262626) 35%, transparent);
       }
       [aria-modal="true"],
       [role="menu"],
