@@ -126,8 +126,8 @@ export function patchRenderer(src: string, term: TermMetrics): { src: string; no
     );
   }
 
-  for (const { label, pattern, replacement } of DIFF_PALETTE) {
-    patcher.replaceRe(label, pattern, replacement, 1);
+  for (const { label, pattern, replacement, expect } of DIFF_PALETTE) {
+    patcher.replaceRe(label, pattern, replacement, expect);
   }
   for (const { label, pattern, replacement, expect } of GLASS_SURFACES) {
     patcher.replaceRe(label, pattern, replacement, expect);

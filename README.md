@@ -21,7 +21,7 @@ Paseo's window is opaque, and Electron gives plugins no way to change that. Pase
 - **Live glass**: material, blur radius, tint and main-pane glass, applied without a restart.
 - **Open files in a new tab**: optionally keep Files and Changes from replacing the focused file tab.
 - **Self-updating**: checks Paseo's GitHub releases, verifies each download against Paseo's Developer ID signature, and rebuilds the copy.
-- **Glass all the way through**: selected rows and tabs, hover states, menus, dialogs, tooltips and toasts are translucent and blurred instead of opaque slabs. Your messages, the composer, its autocomplete and chips, and expanded tool calls share one frosted fill. The diff view stays opaque.
+- **Glass all the way through**: selected rows and tabs, hover states, menus, dialogs, tooltips, toasts and the diff view are translucent and blurred instead of opaque slabs. Your messages, the composer, its autocomplete and chips, and expanded tool calls share one frosted fill.
 - **Workspace labels on their own line**: label chips sit under the branch in the sidebar instead of squeezing it.
 - **Readable workspace title**: the workspace header title uses Medium weight instead of stock Paseo's thin Light weight.
 - **Calmer while agents run**: spinners and shimmers are stepped instead of animating every frame, which cuts WindowServer load.

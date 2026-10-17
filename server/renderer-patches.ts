@@ -199,6 +199,15 @@ export const TAB_GLASS: ExpectedReTableEntry[] = [
     expect: 2,
   },
   {
+    // The Files and Changes trees mark the hovered row with `active`, a name
+    // the HOVER_HIGHLIGHT sweep does not match, so it stayed an opaque
+    // `surfaceSidebarHover` (#161616) bar.
+    label: "overlay file tree row hover",
+    pattern: /(,active:\{backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surfaceSidebarHover(,uni__dependencies:\[0\]\},name:\{color:)/g,
+    replacement: `$1"${OVERLAY_FILL}"$2`,
+    expect: 1,
+  },
+  {
     label: "clear tab scrim",
     pattern: /TrailingActionScrim,\{backdrop:[A-Za-z_$][\w$]*\}\)/g,
     replacement: 'TrailingActionScrim,{backdrop:"surfaceSidebar"})',
@@ -301,17 +310,13 @@ export const WINDOW_CHROME_PAYLOAD: ExpectedReTableEntry = {
 };
 
 // Prepended to the bundle: `__paseoAlpha` composites a hex surface down to a
-// given alpha; `__paseoOpaque` is its inverse for surfaces that must stay
-// solid (diff canvas — see DIFF_PALETTE). Landed as a `var` in front of the
-// bundle's own first-line `var`, which both of Paseo's theme-factory
-// closures can see.
+// given alpha. Landed as a `var` in front of the bundle's own first-line
+// `var`, which both of Paseo's theme-factory closures can see.
 export const ALPHA_HELPER =
   'var __paseoAlpha=function(h,a){var v=String(h||"").replace("#","");' +
   "return v.length<6?h:" +
   '"rgba("+parseInt(v.slice(0,2),16)+", "+parseInt(v.slice(2,4),16)+", "' +
-  '+parseInt(v.slice(4,6),16)+", "+a+")"};' +
-  'var __paseoOpaque=function(c){return String(c||"")' +
-  '.replace(/^rgba\\((.+),\\s*[\\d.]+\\)$/,"rgba($1, 1)")};\n';
+  '+parseInt(v.slice(4,6),16)+", "+a+")"};\n';
 
 // The four large-area surface tokens (surface0, background, sidebar,
 // workspace), alpha 0 always, plus the selection: the selected sidebar row
@@ -356,7 +361,8 @@ export const SURFACE_PATCHES: ExpectedReTableEntry[] = [
   {
     // Dark themes select with `surface2` (base01), the same colour as the
     // hover fill, so the selection steps up to `surface3` (oxocarbon base02)
-    // at 80% to stay distinct; light themes keep their `surface4`.
+    // at 80% to stay distinct; light themes keep their own token (`surface3`
+    // in 0.11.x, `surface4` in 0.12).
     label: "glass selection (dark)",
     pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.surface2,surfaceWorkspace:/g,
     replacement: "surfaceSidebarSelected:__paseoAlpha($1.surface3,0.8),surfaceWorkspace:",
@@ -364,8 +370,8 @@ export const SURFACE_PATCHES: ExpectedReTableEntry[] = [
   },
   {
     label: "glass selection (light)",
-    pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.surface4,surfaceWorkspace:/g,
-    replacement: "surfaceSidebarSelected:__paseoAlpha($1.surface4,0.8),surfaceWorkspace:",
+    pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.(surface[34]),surfaceWorkspace:/g,
+    replacement: "surfaceSidebarSelected:__paseoAlpha($1.$2,0.8),surfaceWorkspace:",
     expect: 1,
   },
 ];
@@ -387,20 +393,20 @@ export const STOCK_ANSI: ExpectedReTableEntry = {
   expect: 1,
 };
 
-// Paseo draws diffs onto a <canvas>, only ever `fillRect`, never `clearRect`
-// — a surface with any alpha below 1 fails to erase the previous frame and
-// scrolling ghosts. The diff pane is the one surface in the app that cannot
-// be glass; forced back to opaque with `__paseoOpaque`.
-export const DIFF_PALETTE: ReTableEntry[] = [
+// Paseo draws diffs onto a <canvas>, but clears each painted region before
+// filling it (0.11.x and 0.12), so the canvas can be glass: its `surface`,
+// `headerSurface` and `emptyBackground` all read the already-transparent
+// `surface0`, and need no patch. Added and removed lines keep their own
+// translucent tints. The header of the file under the pointer (stock opaque
+// `surface1`) takes the hover glass. The sticky file header is a separate
+// canvas over the scrolling one; FLOATING_SURFACES_CSS gives its wrapper the
+// floating-surface fill and blur so code scrolling under it stays unreadable.
+export const DIFF_PALETTE: ExpectedReTableEntry[] = [
   {
-    label: "diff canvas surface",
-    pattern: /surface:([A-Za-z_$][\w$]*)\.colors\.surface0,headerSurface:\1\.colors\.surface0,/g,
-    replacement: "surface:__paseoOpaque($1.colors.surface0),headerSurface:__paseoOpaque($1.colors.surface0),",
-  },
-  {
-    label: "diff canvas empty rows",
-    pattern: /emptyBackground:([A-Za-z_$][\w$]*)\.colors\.surface0,/g,
-    replacement: "emptyBackground:__paseoOpaque($1.colors.surface0),",
+    label: "glass diff active header",
+    pattern: /headerActiveSurface:([A-Za-z_$][\w$]*)\.colors\.surface1,/g,
+    replacement: "headerActiveSurface:$1.colors.interactionHighlight,",
+    expect: 1,
   },
 ];
 
@@ -599,19 +605,28 @@ export const FLOATING_SURFACES_CSS = `
       [role="dialog"],
       [role="menu"],
       [role="listbox"],
-      [role="tooltip"] {
+      [role="tooltip"],
+      [data-menu-surface="true"] {
         background-color: ${OVERLAY_FILL} !important;
         backdrop-filter: ${GLASS_BLUR} !important;
         border-color: transparent !important;
+      }
+      /* the diff's sticky file header: a canvas inside this wrapper, painted
+         with the now-transparent header surface over scrolling code */
+      [data-diff-sticky-header-path] {
+        background-color: ${OVERLAY_FILL};
+        backdrop-filter: ${GLASS_BLUR};
       }
       /* Paseo's shell gives every [tabindex] element -webkit-app-region:
          no-drag, and in the desktop window that region is where
          backdrop-filter stopped rendering: the combobox popup (tabindex -1,
          portaled to #overlay-root) showed its backdrop unblurred while
-         popups without a tabindex blurred. Popups in #overlay-root sit over
-         content, not the titlebar, so they emit no region; their buttons
-         keep their own no-drag. */
-      #overlay-root :is([aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"]) {
+         popups without a tabindex blurred. Dropdown menus (MenuSurface,
+         marked data-menu-surface, also tabindex -1) get the same reset.
+         Popups sit over content, so they need no region of their own; their
+         items and buttons keep their own no-drag. */
+      #overlay-root :is([aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"]),
+      [data-menu-surface="true"] {
         -webkit-app-region: initial !important;
       }
       /* xterm sits flush against the pane edge; FitAddon subtracts this */
