@@ -30,6 +30,7 @@ import {
   SCRIM_COLOURS,
   STOCK_ANSI,
   SURFACE_PATCHES,
+  TAB_GLASS,
   TERMINAL_METRICS,
   TERMINAL_METRICS_SYNC,
   WINDOW_CHROME_PAYLOAD,
@@ -140,6 +141,9 @@ export function patchRenderer(src: string, term: TermMetrics): { src: string; no
   patcher.replaceRe(SCRIM_COLOURS.label, SCRIM_COLOURS.pattern, SCRIM_COLOURS.replacement, SCRIM_COLOURS.expect);
   patcher.sweepRe(KEBAB_CHIP.label, KEBAB_CHIP.pattern, KEBAB_CHIP.replacement);
   patcher.replaceRe(KEBAB_GUTTER.label, KEBAB_GUTTER.pattern, KEBAB_GUTTER.replacement, KEBAB_GUTTER.expect);
+  for (const { label, pattern, replacement, expect } of TAB_GLASS) {
+    patcher.replaceRe(label, pattern, replacement, expect);
+  }
   patcher.replaceRe(
     HANDLE_HIGHLIGHT.label,
     HANDLE_HIGHLIGHT.pattern,
