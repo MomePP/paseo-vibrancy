@@ -362,11 +362,12 @@ export const DIFF_PALETTE: ReTableEntry[] = [
   },
 ];
 
-// Floating surfaces are glass like the workspace and fill like a hovered
-// sidebar row: the theme's `interactionHighlight` (white 8% on dark themes)
-// over the same body wash, so a hover card reads as the row it came from. A
-// strong blur keeps text under a menu or dialog from showing through
-// legibly.
+// Floating surfaces (menus, dialogs, comboboxes, hover cards, tooltips,
+// toasts, the composer's autocomplete) share one look: the theme's `surface2`
+// (oxocarbon base01) at 60% under a 24px blur, with no outline. They float
+// over chat text, and the earlier white 8% fill left that text competing
+// with their own. The hover glass (`interactionHighlight`, white 8% on dark
+// themes) stays for hover and active rows.
 //
 // The user's message bubble, the composer and the pills above it (the diff
 // stat chip) are frosted instead: the theme's `surface2` (oxocarbon base01)
@@ -384,9 +385,6 @@ const GLASS_FILL = "var(--paseo-glass-fill)";
 const GLASS_BLUR = "blur(24px) saturate(1.4)";
 const FROST_FILL = "var(--paseo-frost-fill)";
 const FROST_BLUR = "blur(14px) saturate(1.2)";
-// The composer's autocomplete floats over chat text, where the light frost
-// left the text behind legible enough to fight the suggestions. Same base01,
-// denser, under the floating-surface blur.
 const OVERLAY_FILL = "var(--paseo-overlay-fill)";
 
 // Surfaces with no ARIA role or test id, reachable only at the style object:
@@ -403,13 +401,13 @@ export const GLASS_SURFACES: ExpectedReTableEntry[] = [
   {
     label: "glass annotate card",
     pattern: /(annotationCard:\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface0/g,
-    replacement: `$1"${GLASS_FILL}",backdropFilter:"${GLASS_BLUR}"`,
+    replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${GLASS_BLUR}"`,
     expect: 1,
   },
   {
     label: "glass toast pill",
     pattern: /(toast:Object\.assign\(\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface0/g,
-    replacement: `$1"${GLASS_FILL}",backdropFilter:"${GLASS_BLUR}"`,
+    replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${GLASS_BLUR}"`,
     expect: 1,
   },
   {
@@ -568,7 +566,7 @@ export const HTML_WASH_REPLACEMENT =
 // Floating surfaces (menus, dialogs, listboxes, tooltips) inherit `surface0`
 // rather than `popover`, so zeroing that token took them with it. Fixed with
 // a stylesheet rather than a bundle patch: Paseo emits its theme as CSS
-// custom properties, so GLASS_FILL follows the theme picker for every built-in
+// custom properties, so OVERLAY_FILL follows the theme picker for every built-in
 // theme for free. Selectors are ARIA roles/Paseo's own test ids, both far
 // more stable across releases than a minified style object.
 export const FLOATING_SURFACES_CSS = `
@@ -581,11 +579,23 @@ export const FLOATING_SURFACES_CSS = `
         --paseo-overlay-fill: color-mix(in srgb, var(--colors-surface2, #262626) 60%, transparent);
       }
       [aria-modal="true"],
+      [role="dialog"],
       [role="menu"],
       [role="listbox"],
       [role="tooltip"] {
-        background-color: ${GLASS_FILL} !important;
+        background-color: ${OVERLAY_FILL} !important;
         backdrop-filter: ${GLASS_BLUR} !important;
+        border-color: transparent !important;
+      }
+      /* Paseo's shell gives every [tabindex] element -webkit-app-region:
+         no-drag, and in the desktop window that region is where
+         backdrop-filter stopped rendering: the combobox popup (tabindex -1,
+         portaled to #overlay-root) showed its backdrop unblurred while
+         popups without a tabindex blurred. Popups in #overlay-root sit over
+         content, not the titlebar, so they emit no region; their buttons
+         keep their own no-drag. */
+      #overlay-root :is([aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"]) {
+        -webkit-app-region: initial !important;
       }
       /* xterm sits flush against the pane edge; FitAddon subtracts this */
       .xterm {
