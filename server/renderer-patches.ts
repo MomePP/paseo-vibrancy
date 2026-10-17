@@ -382,6 +382,10 @@ const GLASS_FILL = "var(--paseo-glass-fill)";
 const GLASS_BLUR = "blur(24px) saturate(1.4)";
 const FROST_FILL = "var(--paseo-frost-fill)";
 const FROST_BLUR = "blur(5px) saturate(1.2)";
+// The composer's autocomplete floats over chat text, where the light frost
+// left the text behind legible enough to fight the suggestions. Same base01,
+// denser, under the floating-surface blur.
+const OVERLAY_FILL = "var(--paseo-overlay-fill)";
 
 // Surfaces with no ARIA role or test id, reachable only at the style object:
 // the browser pane's "Annotate element" card, the toast pill, the user's
@@ -449,14 +453,14 @@ export const GLASS_SURFACES: ExpectedReTableEntry[] = [
   {
     label: "glass autocomplete detail card",
     pattern: /(detailCard:Object\.assign\(\{backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1,borderWidth:[A-Za-z_$][\w$]*\.borderWidth\[1\]/g,
-    replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}",borderWidth:0`,
+    replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${GLASS_BLUR}",borderWidth:0`,
     expect: 1,
   },
   {
     label: "glass autocomplete list",
     pattern:
       /(container:Object\.assign\(\{flexShrink:1,minHeight:0,backgroundColor:)([A-Za-z_$][\w$]*)\.colors\.surface1,borderWidth:\2\.borderWidth\[1\](,borderColor:\2\.colors\.borderAccent,borderRadius:\2\.borderRadius\.lg,overflow:"hidden")/g,
-    replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}",borderWidth:0$3`,
+    replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${GLASS_BLUR}",borderWidth:0$3`,
     expect: 1,
   },
   {
@@ -572,6 +576,7 @@ export const FLOATING_SURFACES_CSS = `
       :root {
         --paseo-glass-fill: var(--colors-interaction-highlight, rgba(255, 255, 255, 0.08));
         --paseo-frost-fill: color-mix(in srgb, var(--colors-surface2, #262626) 35%, transparent);
+        --paseo-overlay-fill: color-mix(in srgb, var(--colors-surface2, #262626) 60%, transparent);
       }
       [aria-modal="true"],
       [role="menu"],
