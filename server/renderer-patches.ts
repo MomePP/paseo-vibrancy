@@ -142,10 +142,37 @@ export const KEBAB_GUTTER: ExpectedReTableEntry = {
   expect: 2,
 };
 
-// Workspace tabs, made to match the sidebar rows: hover is the shared
-// translucent `interactionHighlight`, the focused tab is the glass selection
-// (`surfaceSidebarSelected`, see SURFACE_PATCHES), and the active tab of an
-// unfocused pane takes the hover glass. A tab used to fade its label under
+// Floating surfaces (menus, dialogs, comboboxes, hover cards, tooltips,
+// toasts, the composer's autocomplete) share one look: the theme's `surface2`
+// (oxocarbon base01) at 60% under a 24px blur, with no outline. They float
+// over chat text, and the earlier white 8% fill left that text competing
+// with their own. Hovered sidebar workspace rows and workspace tabs take the
+// same fill (see TAB_GLASS); the hover glass (`interactionHighlight`, white
+// 8% on dark themes) stays for other hover states and menu active rows.
+//
+// The user's message bubble, the composer and the pills above it (the diff
+// stat chip) are frosted instead: the theme's `surface2` (oxocarbon base01)
+// at 35%, darker than the hover white, so the surface stays see-through
+// rather than a flat grey slab (a white tint read as opaque; 55% still too
+// solid). The blur is 14px: at 5px, chat text scrolling under the composer
+// and chips stayed legible as ghost letters behind muted placeholder and
+// description text, and 10px still smeared word shapes through.
+//
+// All three are defined once on `:root` by FLOATING_SURFACES_CSS. Unistyles names a
+// theme var by hyphenating the key (`--colors-interaction-highlight`); the
+// fallbacks are the dark values. react-native-web passes a colour through
+// untouched only when it starts with `var(`, so inline styles use the var.
+const GLASS_FILL = "var(--paseo-glass-fill)";
+const GLASS_BLUR = "blur(24px) saturate(1.4)";
+const FROST_FILL = "var(--paseo-frost-fill)";
+const FROST_BLUR = "blur(14px) saturate(1.2)";
+const OVERLAY_FILL = "var(--paseo-overlay-fill)";
+
+// Workspace tabs and sidebar workspace rows share their states: hover (and
+// the active tab of an unfocused pane) is the floating-surface fill, base01
+// at 60%, so a hovered row matches the hover card it opens; the focused tab
+// and the selected row are the selection (`surfaceSidebarSelected`, see
+// SURFACE_PATCHES), one clear step above it. A tab used to fade its label under
 // the close button with an opaque scrim, which shows as a solid block on a
 // glass fill, so the scrim is cleared and a tab that has a close button
 // keeps its label in a constant gutter clear of it (18px, the button's own
@@ -155,15 +182,21 @@ export const KEBAB_GUTTER: ExpectedReTableEntry = {
 // of its label plus a per-tab extra (12px for the modified dot) and reserves
 // nothing for the overlaid close button, so closable tabs get the 18px added
 // the same way: without it they came out 18px too narrow and truncated their
-// own label. The fill patch runs after HOVER_HIGHLIGHT, which has already
-// turned `tabHovered` into `interactionHighlight`.
+// own label. The fill patches run after HOVER_HIGHLIGHT, which has already
+// turned `tabHovered` and `workspaceRowHovered` into `interactionHighlight`.
 export const TAB_GLASS: ExpectedReTableEntry[] = [
   {
     label: "glass tab fills",
     pattern:
-      /tabHovered:\{backgroundColor:([A-Za-z_$][\w$]*)\.colors\.interactionHighlight(,uni__dependencies:\[0\]\},tabActive:\{backgroundColor:\1\.colors\.)surface2(,uni__dependencies:\[0\]\},tabActiveUnfocused:\{backgroundColor:\1\.colors\.)surface1\b/g,
-    replacement: "tabHovered:{backgroundColor:$1.colors.interactionHighlight$2surfaceSidebarSelected$3interactionHighlight",
+      /(tabHovered:\{backgroundColor:)([A-Za-z_$][\w$]*)\.colors\.interactionHighlight(,uni__dependencies:\[0\]\},tabActive:\{backgroundColor:\2\.colors\.)surface2(,uni__dependencies:\[0\]\},tabActiveUnfocused:\{backgroundColor:)\2\.colors\.surface1\b/g,
+    replacement: `$1"${OVERLAY_FILL}"$3surfaceSidebarSelected$4"${OVERLAY_FILL}"`,
     expect: 1,
+  },
+  {
+    label: "overlay sidebar row hover",
+    pattern: /(workspaceRowHovered:\{backgroundColor:)[A-Za-z_$][\w$]*\.colors\.interactionHighlight\b/g,
+    replacement: `$1"${OVERLAY_FILL}"`,
+    expect: 2,
   },
   {
     label: "clear tab scrim",
@@ -321,10 +354,19 @@ export const SURFACE_PATCHES: ExpectedReTableEntry[] = [
     expect: 1,
   },
   {
-    label: "glass selection",
-    pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.(surface\d),surfaceWorkspace:/g,
-    replacement: "surfaceSidebarSelected:__paseoAlpha($1.$2,0.6),surfaceWorkspace:",
-    expect: 2,
+    // Dark themes select with `surface2` (base01), the same colour as the
+    // hover fill, so the selection steps up to `surface3` (oxocarbon base02)
+    // at 80% to stay distinct; light themes keep their `surface4`.
+    label: "glass selection (dark)",
+    pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.surface2,surfaceWorkspace:/g,
+    replacement: "surfaceSidebarSelected:__paseoAlpha($1.surface3,0.8),surfaceWorkspace:",
+    expect: 1,
+  },
+  {
+    label: "glass selection (light)",
+    pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.surface4,surfaceWorkspace:/g,
+    replacement: "surfaceSidebarSelected:__paseoAlpha($1.surface4,0.8),surfaceWorkspace:",
+    expect: 1,
   },
 ];
 
@@ -361,31 +403,6 @@ export const DIFF_PALETTE: ReTableEntry[] = [
     replacement: "emptyBackground:__paseoOpaque($1.colors.surface0),",
   },
 ];
-
-// Floating surfaces (menus, dialogs, comboboxes, hover cards, tooltips,
-// toasts, the composer's autocomplete) share one look: the theme's `surface2`
-// (oxocarbon base01) at 60% under a 24px blur, with no outline. They float
-// over chat text, and the earlier white 8% fill left that text competing
-// with their own. The hover glass (`interactionHighlight`, white 8% on dark
-// themes) stays for hover and active rows.
-//
-// The user's message bubble, the composer and the pills above it (the diff
-// stat chip) are frosted instead: the theme's `surface2` (oxocarbon base01)
-// at 35%, darker than the hover white, so the surface stays see-through
-// rather than a flat grey slab (a white tint read as opaque; 55% still too
-// solid). The blur is 14px: at 5px, chat text scrolling under the composer
-// and chips stayed legible as ghost letters behind muted placeholder and
-// description text, and 10px still smeared word shapes through.
-//
-// Both are defined once on `:root` by FLOATING_SURFACES_CSS. Unistyles names a
-// theme var by hyphenating the key (`--colors-interaction-highlight`); the
-// fallbacks are the dark values. react-native-web passes a colour through
-// untouched only when it starts with `var(`, so inline styles use the var.
-const GLASS_FILL = "var(--paseo-glass-fill)";
-const GLASS_BLUR = "blur(24px) saturate(1.4)";
-const FROST_FILL = "var(--paseo-frost-fill)";
-const FROST_BLUR = "blur(14px) saturate(1.2)";
-const OVERLAY_FILL = "var(--paseo-overlay-fill)";
 
 // Surfaces with no ARIA role or test id, reachable only at the style object:
 // the browser pane's "Annotate element" card, the toast pill, the user's
