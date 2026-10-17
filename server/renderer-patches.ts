@@ -336,31 +336,44 @@ export const DIFF_PALETTE: ReTableEntry[] = [
   },
 ];
 
-// Floating surfaces are glass like the workspace and fill like a hovered
-// sidebar row: the theme's `interactionHighlight` (white 8% on dark themes)
-// over the same body wash, so a hover card reads as the row it came from.
-// A blur of whatever sits behind the surface keeps text under a menu or
-// dialog from showing through legibly. Defined once on `:root` by
-// OPAQUE_SURFACES_CSS; Unistyles names the theme var by hyphenating the key
+// Floating surfaces, the user's message bubble and the composer are glass
+// like the workspace and fill like a hovered sidebar row: the theme's
+// `interactionHighlight` (white 8% on dark themes) over the same body wash,
+// so a hover card reads as the row it came from. A blur of whatever sits
+// behind the surface keeps text under a menu, dialog or the composer from
+// showing through legibly. Defined once on `:root` by OPAQUE_SURFACES_CSS;
+// Unistyles names the theme var by hyphenating the key
 // (`--colors-interaction-highlight`), with the dark value as fallback.
 // react-native-web passes a colour through untouched only when it starts
 // with `var(`, so inline styles use the var.
-const POPUP_BG = "var(--paseo-popup-bg)";
-const POPUP_BLUR = "blur(24px) saturate(1.4)";
+const GLASS_FILL = "var(--paseo-glass-fill)";
+const GLASS_BLUR = "blur(24px) saturate(1.4)";
 
-// Two floating surfaces with no ARIA role and no test id, reachable only at
-// the style object: the browser pane's "Annotate element" card and the toast
-// pill.
-export const OVERLAY_SURFACES: ReTableEntry[] = [
+// Surfaces with no ARIA role or test id, reachable only at the style object:
+// the browser pane's "Annotate element" card, the toast pill, the user's
+// message bubble (stock `surface3`, a solid slab) and the composer box
+// (stock `surface1`).
+export const GLASS_SURFACES: ReTableEntry[] = [
   {
     label: "glass annotate card",
     pattern: /(annotationCard:\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface0/g,
-    replacement: `$1"${POPUP_BG}",backdropFilter:"${POPUP_BLUR}"`,
+    replacement: `$1"${GLASS_FILL}",backdropFilter:"${GLASS_BLUR}"`,
   },
   {
     label: "glass toast pill",
     pattern: /(toast:Object\.assign\(\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface0/g,
-    replacement: `$1"${POPUP_BG}",backdropFilter:"${POPUP_BLUR}"`,
+    replacement: `$1"${GLASS_FILL}",backdropFilter:"${GLASS_BLUR}"`,
+  },
+  {
+    label: "glass message bubble",
+    pattern: /(bubble:\{backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface3(,borderRadius:[A-Za-z_$][\w$]*\.borderRadius\["2xl"\],borderTopRightRadius:)/g,
+    replacement: `$1"${GLASS_FILL}",backdropFilter:"${GLASS_BLUR}"$2`,
+  },
+  {
+    label: "glass composer",
+    pattern:
+      /(inputWrapper:Object\.assign\(\{flexShrink:1,flexDirection:"column",gap:[A-Za-z_$][\w$]*\.spacing\[3\],backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1/g,
+    replacement: `$1"${GLASS_FILL}",backdropFilter:"${GLASS_BLUR}"`,
   },
 ];
 
@@ -453,7 +466,7 @@ export const HTML_WASH_REPLACEMENT =
 // Floating surfaces (menus, dialogs, listboxes, tooltips) inherit `surface0`
 // rather than `popover`, so zeroing that token took them with it. Fixed with
 // a stylesheet rather than a bundle patch: Paseo emits its theme as CSS
-// custom properties, so POPUP_BG follows the theme picker for every built-in
+// custom properties, so GLASS_FILL follows the theme picker for every built-in
 // theme for free. Selectors are ARIA roles/Paseo's own test ids, both far
 // more stable across releases than a minified style object.
 export const OPAQUE_SURFACES_CSS = `
@@ -461,14 +474,14 @@ export const OPAQUE_SURFACES_CSS = `
       /* added by paseo-vibrancy: floating surfaces are glass, blurred so
          what is behind them stays unreadable */
       :root {
-        --paseo-popup-bg: var(--colors-interaction-highlight, rgba(255, 255, 255, 0.08));
+        --paseo-glass-fill: var(--colors-interaction-highlight, rgba(255, 255, 255, 0.08));
       }
       [aria-modal="true"],
       [role="menu"],
       [role="listbox"],
       [role="tooltip"] {
-        background-color: ${POPUP_BG} !important;
-        backdrop-filter: ${POPUP_BLUR} !important;
+        background-color: ${GLASS_FILL} !important;
+        backdrop-filter: ${GLASS_BLUR} !important;
       }
       /* xterm sits flush against the pane edge; FitAddon subtracts this */
       .xterm {
@@ -510,7 +523,7 @@ export const BUILD_TABLES = {
   OXOCARBON_ANSI,
   STOCK_ANSI,
   DIFF_PALETTE,
-  OVERLAY_SURFACES,
+  GLASS_SURFACES,
   RING_STEPS,
   RING_SLOWDOWN,
   LOADER_SLOWDOWN,

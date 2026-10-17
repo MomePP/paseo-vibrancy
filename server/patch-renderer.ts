@@ -15,6 +15,7 @@ import {
   DIFF_PALETTE,
   FRAME_RATE,
   FILE_TAB_REUSE,
+  GLASS_SURFACES,
   HANDLE_HIGHLIGHT,
   HOVER_HIGHLIGHT,
   HTML_FLASH_GUARD,
@@ -25,7 +26,6 @@ import {
   LABELS_LINE,
   NAVIGATOR_BACKDROP,
   OPAQUE_SURFACES_CSS,
-  OVERLAY_SURFACES,
   PANE,
   RENDERER_PATCHES,
   SCRIM_COLOURS,
@@ -129,7 +129,7 @@ export function patchRenderer(src: string, term: TermMetrics): { src: string; no
   for (const { label, pattern, replacement } of DIFF_PALETTE) {
     patcher.replaceRe(label, pattern, replacement, 1);
   }
-  for (const { label, pattern, replacement } of OVERLAY_SURFACES) {
+  for (const { label, pattern, replacement } of GLASS_SURFACES) {
     patcher.replaceRe(label, pattern, replacement, 1);
   }
   for (const { label, pattern, replacement } of FRAME_RATE) {
