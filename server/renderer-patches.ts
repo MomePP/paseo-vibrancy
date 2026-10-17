@@ -118,9 +118,10 @@ export const SCRIM_COLOURS: ExpectedReTableEntry = {
 
 // Two kebabs (sidebar row, card), unpainted in stock because the wedge
 // behind them did the work; given a background now that the wedge is
-// transparent. The theme binding is borrowed from the hovered variant that
-// follows each one.
-export const KEBAB_CHIP_TOKEN = "surface2";
+// transparent. The hover glass, like the row under it, not an opaque chip.
+// The theme binding is borrowed from the hovered variant that follows each
+// one.
+export const KEBAB_CHIP_TOKEN = "interactionHighlight";
 export const KEBAB_CHIP: ReTableEntry = {
   label: "kebab chip",
   pattern: /kebabButton:\{padding:2,borderRadius:4(,marginLeft:2)?\},kebabButtonHovered:\{backgroundColor:([A-Za-z_$][\w$]*)\.colors\./g,
@@ -373,7 +374,7 @@ export const DIFF_PALETTE: ReTableEntry[] = [
 // scrolling under the composer shows as soft shapes rather than a flat grey
 // slab (a 24px blur under a white tint read as opaque; 55% still too solid).
 //
-// Both are defined once on `:root` by OPAQUE_SURFACES_CSS. Unistyles names a
+// Both are defined once on `:root` by FLOATING_SURFACES_CSS. Unistyles names a
 // theme var by hyphenating the key (`--colors-interaction-highlight`); the
 // fallbacks are the dark values. react-native-web passes a colour through
 // untouched only when it starts with `var(`, so inline styles use the var.
@@ -385,24 +386,31 @@ const FROST_BLUR = "blur(5px) saturate(1.2)";
 // Surfaces with no ARIA role or test id, reachable only at the style object:
 // the browser pane's "Annotate element" card, the toast pill, the user's
 // message bubble (stock `surface3`, a solid slab), the composer box (stock
-// `surface1`), the composer pills (`composerPillStyles`, stock `surface1`
-// with an opaque `surface2` hover, now the shared hover fill) and the chat's
-// scroll-to-bottom button (stock `surface2`).
-export const GLASS_SURFACES: ReTableEntry[] = [
+// `surface1`) and its counterpart in the New workspace dialog (`surface2`),
+// the composer pills (`composerPillStyles`, stock `surface1` with an opaque
+// `surface2` hover, now the shared hover fill), the chat's scroll-to-bottom
+// button (stock `surface2`), an expanded tool call in the chat (`surface1`),
+// the composer's autocomplete list and detail card (`surface1` with an
+// outline, now frosted and borderless like the composer) and the active row
+// of menus, the autocomplete and comboboxes (opaque, now the hover glass).
+export const GLASS_SURFACES: ExpectedReTableEntry[] = [
   {
     label: "glass annotate card",
     pattern: /(annotationCard:\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface0/g,
     replacement: `$1"${GLASS_FILL}",backdropFilter:"${GLASS_BLUR}"`,
+    expect: 1,
   },
   {
     label: "glass toast pill",
     pattern: /(toast:Object\.assign\(\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface0/g,
     replacement: `$1"${GLASS_FILL}",backdropFilter:"${GLASS_BLUR}"`,
+    expect: 1,
   },
   {
     label: "glass message bubble",
     pattern: /(bubble:\{backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface3(,borderRadius:[A-Za-z_$][\w$]*\.borderRadius\["2xl"\],borderTopRightRadius:)/g,
     replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}"$2`,
+    expect: 1,
   },
   {
     // No outline either, so the composer reads as the same frosted surface
@@ -411,17 +419,57 @@ export const GLASS_SURFACES: ReTableEntry[] = [
     pattern:
       /(inputWrapper:Object\.assign\(\{flexShrink:1,flexDirection:"column",gap:[A-Za-z_$][\w$]*\.spacing\[3\],backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1,borderWidth:[A-Za-z_$][\w$]*\.borderWidth\[1\]/g,
     replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}",borderWidth:0`,
+    expect: 1,
+  },
+  {
+    label: "glass setup dialog composer",
+    pattern: /(composerInputWrapper:\{backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface2/g,
+    replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}"`,
+    expect: 1,
   },
   {
     label: "glass composer pill",
     pattern:
       /(body:\{flexDirection:"row",alignItems:"center",gap:([A-Za-z_$][\w$]*)\.spacing\[2\],minHeight:[\w$]+,paddingHorizontal:\2\.spacing\[3\],paddingVertical:\2\.spacing\[1\],borderRadius:\2\.borderRadius\["2xl"\],borderWidth:\2\.borderWidth\[1\],borderColor:\2\.colors\.borderAccent,backgroundColor:)\2\.colors\.surface1(,uni__dependencies:\[0\]\},bodyActive:\{backgroundColor:)\2\.colors\.surface2/g,
     replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}"$3"${GLASS_FILL}"`,
+    expect: 1,
   },
   {
     label: "glass scroll-to-bottom button",
     pattern: /(scrollToBottomButton:Object\.assign\(\{width:48,height:48,borderRadius:24,backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface2/g,
     replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}"`,
+    expect: 1,
+  },
+  {
+    label: "glass expanded tool call",
+    pattern: /(pressableExpanded:\{backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1/g,
+    replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}"`,
+    expect: 1,
+  },
+  {
+    label: "glass autocomplete detail card",
+    pattern: /(detailCard:Object\.assign\(\{backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1,borderWidth:[A-Za-z_$][\w$]*\.borderWidth\[1\]/g,
+    replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}",borderWidth:0`,
+    expect: 1,
+  },
+  {
+    label: "glass autocomplete list",
+    pattern:
+      /(container:Object\.assign\(\{flexShrink:1,minHeight:0,backgroundColor:)([A-Za-z_$][\w$]*)\.colors\.surface1,borderWidth:\2\.borderWidth\[1\](,borderColor:\2\.colors\.borderAccent,borderRadius:\2\.borderRadius\.lg,overflow:"hidden")/g,
+    replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}",borderWidth:0$3`,
+    expect: 1,
+  },
+  {
+    label: "glass menu active row",
+    pattern: /([{,]itemActive:\{backgroundColor:)([A-Za-z_$][\w$]*)\.colors\.surface2\b/g,
+    replacement: "$1$2.colors.interactionHighlight",
+    expect: 2,
+  },
+  {
+    label: "glass combobox active row",
+    pattern: /(comboboxItemActive:\{backgroundColor:)([A-Za-z_$][\w$]*)\.colors\.surface1\b/g,
+    replacement: "$1$2.colors.interactionHighlight",
+    expect: 1,
   },
 ];
 
@@ -517,8 +565,8 @@ export const HTML_WASH_REPLACEMENT =
 // custom properties, so GLASS_FILL follows the theme picker for every built-in
 // theme for free. Selectors are ARIA roles/Paseo's own test ids, both far
 // more stable across releases than a minified style object.
-export const OPAQUE_SURFACES_CSS = `
-    <style id="paseo-vibrancy-opaque-surfaces">
+export const FLOATING_SURFACES_CSS = `
+    <style id="paseo-vibrancy-floating-surfaces">
       /* added by paseo-vibrancy: floating surfaces are glass, blurred so
          what is behind them stays unreadable */
       :root {
@@ -584,5 +632,5 @@ export const BUILD_TABLES = {
   TERMINAL_METRICS_SYNC,
   HTML_FLASH_GUARD,
   HTML_WASH_REPLACEMENT,
-  OPAQUE_SURFACES_CSS,
+  FLOATING_SURFACES_CSS,
 } as const;
