@@ -399,7 +399,7 @@ export const STOCK_ANSI: ExpectedReTableEntry = {
 // `surface0`, and need no patch. Added and removed lines keep their own
 // translucent tints. The header of the file under the pointer (stock opaque
 // `surface1`) takes the hover glass. The sticky file header is a separate
-// canvas over the scrolling one; FLOATING_SURFACES_CSS gives its wrapper the
+// canvas over the scrolling one; FLOATING_SURFACES_CSS gives that canvas the
 // floating-surface fill and blur so code scrolling under it stays unreadable.
 export const DIFF_PALETTE: ExpectedReTableEntry[] = [
   {
@@ -611,9 +611,10 @@ export const FLOATING_SURFACES_CSS = `
         backdrop-filter: ${GLASS_BLUR} !important;
         border-color: transparent !important;
       }
-      /* the diff's sticky file header: a canvas inside this wrapper, painted
-         with the now-transparent header surface over scrolling code */
-      [data-diff-sticky-header-path] {
+      /* the diff's sticky file header: a header-sized canvas, painted with
+         the now-transparent header surface over scrolling code. Its wrapper
+         spans the whole file section, so only the canvas gets the glass. */
+      [data-diff-sticky-header-path] canvas {
         background-color: ${OVERLAY_FILL};
         backdrop-filter: ${GLASS_BLUR};
       }
