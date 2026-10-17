@@ -53,14 +53,16 @@ export const PANE = '"var(--paseo-pane-bg, transparent)"';
 
 // `surface0` is Paseo's dark-on-light inverse: the colour it paints *on top
 // of* an opaque fill. Zeroing the token took those foregrounds with it
-// (button labels, status glyphs) — nine sites, fixed by forcing them to the
-// opaque inverse surface.
+// (button labels, status glyphs) — eight sites, fixed by forcing them to the
+// opaque inverse surface. A `surface0:t=>({color:t.colors.surface0})` entry
+// in a backdrop lookup (the trailing scrim, 0.12's EdgeFade) is a gradient
+// fill, not ink: forced opaque it paints a solid band, so it is skipped.
 export const SURFACE1_VAR = "var(--colors-surface1)";
 export const INK_SURFACE0: ExpectedReTableEntry = {
   label: "readable surface0 foregrounds",
-  pattern: /\bcolor:([A-Za-z_$][\w$]*)\.colors\.surface0\b/g,
+  pattern: /(?<!surface0:[A-Za-z_$][\w$]*=>\(\{)\bcolor:([A-Za-z_$][\w$]*)\.colors\.surface0\b/g,
   replacement: `color:"${SURFACE1_VAR}"`,
-  expect: 9,
+  expect: 8,
 };
 
 // Hover fills, unified onto one translucent overlay (`interactionHighlight`)
