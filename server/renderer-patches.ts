@@ -146,15 +146,16 @@ export const KEBAB_GUTTER: ExpectedReTableEntry = {
 // (`surfaceSidebarSelected`, see SURFACE_PATCHES), and the active tab of an
 // unfocused pane takes the hover glass. A tab used to fade its label under
 // the close button with an opaque scrim, which shows as a solid block on a
-// glass fill, so the scrim is cleared and the label instead keeps a constant
-// gutter clear of the close button (18px, the button's own width), the way
-// KEBAB_GUTTER does for sidebar rows; constant so the label does not reflow
-// on hover. Paseo sizes each tab from an off-screen measurement of its label
-// and reserves nothing for the overlaid close button, so the measurement
-// carries the same gutter: without it every tab came out 18px too narrow
-// and truncated its own label ("Files" → "Fi…"). The fill patch runs after
-// HOVER_HIGHLIGHT, which has already turned `tabHovered` into
-// `interactionHighlight`.
+// glass fill, so the scrim is cleared and a tab that has a close button
+// keeps its label in a constant gutter clear of it (18px, the button's own
+// width), the way KEBAB_GUTTER does for sidebar rows; constant so the label
+// does not reflow on hover. Tabs without one (the explorer's Files and
+// Changes) get no gutter. Paseo sizes each tab from an off-screen measurement
+// of its label plus a per-tab extra (12px for the modified dot) and reserves
+// nothing for the overlaid close button, so closable tabs get the 18px added
+// the same way: without it they came out 18px too narrow and truncated their
+// own label. The fill patch runs after HOVER_HIGHLIGHT, which has already
+// turned `tabHovered` into `interactionHighlight`.
 export const TAB_GLASS: ExpectedReTableEntry[] = [
   {
     label: "glass tab fills",
@@ -171,14 +172,20 @@ export const TAB_GLASS: ExpectedReTableEntry[] = [
   },
   {
     label: "tab label gutter",
-    pattern: /(tabHandle:\{flexDirection:"row",alignItems:"center",gap:[A-Za-z_$][\w$]*\.spacing\[1\],flex:1,minWidth:0,userSelect:"none",)/g,
-    replacement: "$1paddingRight:18,",
+    pattern: /(\{presentation:([\w$]+),isHighlighted:[\s\S]{0,2500}?\{style:)([\w$]+\.tabHandle)(,dataSet:)/g,
+    replacement: "$1[$3,$2.showCloseButton&&{paddingRight:18}]$4",
     expect: 1,
   },
   {
-    label: "tab label gutter measured",
-    pattern: /tabLabelMeasurement:\{flexShrink:0\}/g,
-    replacement: "tabLabelMeasurement:{flexShrink:0,paddingRight:18}",
+    label: "tab width carries closable flag",
+    pattern: /(return\{key:([\w$]+)\.tab\.key,label:[\w$]+,modified:\2\.presentation\.modified)\}/g,
+    replacement: "$1,closable:$2.presentation.showCloseButton}",
+    expect: 1,
+  },
+  {
+    label: "tab width with gutter",
+    pattern: /for\(const\{key:([\w$]+),label:([\w$]+),modified:([\w$]+)\}of ([\w$]+)\)(\{[^{}]*?)const ([\w$]+)=\3\?12:0;/g,
+    replacement: "for(const{key:$1,label:$2,modified:$3,closable:__pvClosable}of $4)$5const $6=($3?12:0)+(__pvClosable?18:0);",
     expect: 1,
   },
   {
