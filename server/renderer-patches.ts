@@ -360,8 +360,9 @@ const FROST_BLUR = "blur(5px) saturate(1.2)";
 // Surfaces with no ARIA role or test id, reachable only at the style object:
 // the browser pane's "Annotate element" card, the toast pill, the user's
 // message bubble (stock `surface3`, a solid slab), the composer box (stock
-// `surface1`) and the composer pills (`composerPillStyles`, stock `surface1`
-// with an opaque `surface2` hover, now the shared hover fill).
+// `surface1`), the composer pills (`composerPillStyles`, stock `surface1`
+// with an opaque `surface2` hover, now the shared hover fill) and the chat's
+// scroll-to-bottom button (stock `surface2`).
 export const GLASS_SURFACES: ReTableEntry[] = [
   {
     label: "glass annotate card",
@@ -389,6 +390,11 @@ export const GLASS_SURFACES: ReTableEntry[] = [
     pattern:
       /(body:\{flexDirection:"row",alignItems:"center",gap:([A-Za-z_$][\w$]*)\.spacing\[2\],minHeight:[\w$]+,paddingHorizontal:\2\.spacing\[3\],paddingVertical:\2\.spacing\[1\],borderRadius:\2\.borderRadius\["2xl"\],borderWidth:\2\.borderWidth\[1\],borderColor:\2\.colors\.borderAccent,backgroundColor:)\2\.colors\.surface1(,uni__dependencies:\[0\]\},bodyActive:\{backgroundColor:)\2\.colors\.surface2/g,
     replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}"$3"${GLASS_FILL}"`,
+  },
+  {
+    label: "glass scroll-to-bottom button",
+    pattern: /(scrollToBottomButton:Object\.assign\(\{width:48,height:48,borderRadius:24,backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface2/g,
+    replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}"`,
   },
 ];
 
