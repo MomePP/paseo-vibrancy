@@ -141,6 +141,38 @@ export const KEBAB_GUTTER: ExpectedReTableEntry = {
   expect: 2,
 };
 
+// Workspace tabs, made to match the sidebar rows: hover is the shared
+// translucent `interactionHighlight`, the focused tab is the glass selection
+// (`surfaceSidebarSelected`, see SURFACE_PATCHES), and the active tab of an
+// unfocused pane takes the hover glass. A tab used to fade its label under
+// the close button with an opaque scrim, which shows as a solid block on a
+// glass fill, so the scrim is cleared and the label instead keeps a constant
+// gutter clear of the close button (18px, the button's own width), the way
+// KEBAB_GUTTER does for sidebar rows; constant so the label does not reflow
+// on hover. The fill patch runs after HOVER_HIGHLIGHT, which has already
+// turned `tabHovered` into `interactionHighlight`.
+export const TAB_GLASS: ExpectedReTableEntry[] = [
+  {
+    label: "glass tab fills",
+    pattern:
+      /tabHovered:\{backgroundColor:([A-Za-z_$][\w$]*)\.colors\.interactionHighlight(,uni__dependencies:\[0\]\},tabActive:\{backgroundColor:\1\.colors\.)surface2(,uni__dependencies:\[0\]\},tabActiveUnfocused:\{backgroundColor:\1\.colors\.)surface1\b/g,
+    replacement: "tabHovered:{backgroundColor:$1.colors.interactionHighlight$2surfaceSidebarSelected$3interactionHighlight",
+    expect: 1,
+  },
+  {
+    label: "clear tab scrim",
+    pattern: /TrailingActionScrim,\{backdrop:[A-Za-z_$][\w$]*\}\)/g,
+    replacement: 'TrailingActionScrim,{backdrop:"surfaceSidebar"})',
+    expect: 1,
+  },
+  {
+    label: "tab label gutter",
+    pattern: /(tabHandle:\{flexDirection:"row",alignItems:"center",gap:[A-Za-z_$][\w$]*\.spacing\[1\],flex:1,minWidth:0,userSelect:"none",)/g,
+    replacement: "$1paddingRight:18,",
+    expect: 1,
+  },
+];
+
 // The pane resize handle's hover/drag highlight: oxocarbon's accent is a
 // bright purple that lights up a full-height bar on every pointer crossing.
 // `surface4` (ring) is one clear step above resting `border` with no hue, so
@@ -199,7 +231,9 @@ export const ALPHA_HELPER =
   '.replace(/^rgba\\((.+),\\s*[\\d.]+\\)$/,"rgba($1, 1)")};\n';
 
 // The four large-area surface tokens (surface0, background, sidebar,
-// workspace), alpha 0 always.
+// workspace), alpha 0 always, plus the selection: the selected sidebar row
+// (and, through TAB_GLASS, the focused tab) is the theme's selection colour
+// at 0.6, glass blended with what is behind it rather than an opaque slab.
 // Patches the theme factories' *outputs*, not the palettes feeding them:
 // `surface0` is also `primaryForeground` and `surface2` is `popover`/`input`/
 // `muted`, so an alpha at the palette would make button text and popovers
@@ -235,6 +269,12 @@ export const SURFACE_PATCHES: ExpectedReTableEntry[] = [
     pattern: /surfaceWorkspace:([A-Za-z_$][\w$]*)\.surface1,interactionHighlight:/g,
     replacement: "surfaceWorkspace:__paseoAlpha($1.surface1,0.0),interactionHighlight:",
     expect: 1,
+  },
+  {
+    label: "glass selection",
+    pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.(surface\d),surfaceWorkspace:/g,
+    replacement: "surfaceSidebarSelected:__paseoAlpha($1.$2,0.6),surfaceWorkspace:",
+    expect: 2,
   },
 ];
 
@@ -272,20 +312,28 @@ export const DIFF_PALETTE: ReTableEntry[] = [
   },
 ];
 
+// Floating surfaces are glass like the workspace: the theme's popover colour
+// at the window's tint (the same `--paseo-tint` the body wash uses, so the
+// Tint slider moves both), over a blur of whatever sits behind the surface so
+// text under a menu or dialog never shows through legibly. Defined once on
+// `:root` by OPAQUE_SURFACES_CSS; react-native-web passes a colour through
+// untouched only when it starts with `var(`, so inline styles use the var.
+const POPUP_BG = "var(--paseo-popup-bg)";
+const POPUP_BLUR = "blur(24px) saturate(1.4)";
+
 // Two floating surfaces with no ARIA role and no test id, reachable only at
 // the style object: the browser pane's "Annotate element" card and the toast
-// pill. `var(--colors-popover)` matches what OPAQUE_SURFACES_CSS paints the
-// ARIA-reachable floating surfaces with.
+// pill.
 export const OVERLAY_SURFACES: ReTableEntry[] = [
   {
-    label: "opaque annotate card",
+    label: "glass annotate card",
     pattern: /(annotationCard:\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface0/g,
-    replacement: '$1"var(--colors-popover)"',
+    replacement: `$1"${POPUP_BG}",backdropFilter:"${POPUP_BLUR}"`,
   },
   {
-    label: "opaque toast pill",
+    label: "glass toast pill",
     pattern: /(toast:Object\.assign\(\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface0/g,
-    replacement: '$1"var(--colors-popover)"',
+    replacement: `$1"${POPUP_BG}",backdropFilter:"${POPUP_BLUR}"`,
   },
 ];
 
@@ -375,19 +423,25 @@ export const HTML_FLASH_GUARD = /(html,\s*body\s*\{\s*background-color:\s*)#([0-
 export const HTML_WASH_REPLACEMENT =
   "body { background-color: color-mix(in srgb, var(--colors-surface1, #$2) calc(var(--paseo-tint, 0.85) * 100%), transparent);";
 
-// Floating surfaces (menus, dialogs, listboxes) inherit `surface0` rather
-// than `popover`, so zeroing that token took them with it. Fixed with a
-// stylesheet rather than a bundle patch: Paseo emits its theme as CSS custom
-// properties, so `var(--colors-popover)` follows the theme picker for every
-// built-in theme for free. Selectors are ARIA roles/Paseo's own test ids,
-// both far more stable across releases than a minified style object.
+// Floating surfaces (menus, dialogs, listboxes, tooltips) inherit `surface0`
+// rather than `popover`, so zeroing that token took them with it. Fixed with
+// a stylesheet rather than a bundle patch: Paseo emits its theme as CSS
+// custom properties, so POPUP_BG follows the theme picker for every built-in
+// theme for free. Selectors are ARIA roles/Paseo's own test ids, both far
+// more stable across releases than a minified style object.
 export const OPAQUE_SURFACES_CSS = `
     <style id="paseo-vibrancy-opaque-surfaces">
-      /* added by paseo-vibrancy: keep floating surfaces readable over glass */
+      /* added by paseo-vibrancy: floating surfaces are glass, blurred so
+         what is behind them stays unreadable */
+      :root {
+        --paseo-popup-bg: color-mix(in srgb, var(--colors-popover) calc(var(--paseo-tint, 0.85) * 100%), transparent);
+      }
       [aria-modal="true"],
       [role="menu"],
-      [role="listbox"] {
-        background-color: var(--colors-popover) !important;
+      [role="listbox"],
+      [role="tooltip"] {
+        background-color: ${POPUP_BG} !important;
+        backdrop-filter: ${POPUP_BLUR} !important;
       }
       /* xterm sits flush against the pane edge; FitAddon subtracts this */
       .xterm {
@@ -418,6 +472,7 @@ export const BUILD_TABLES = {
   KEBAB_CHIP,
   KEBAB_GUTTER_PX,
   KEBAB_GUTTER,
+  TAB_GLASS,
   HANDLE_HIGHLIGHT_TOKEN,
   HANDLE_HIGHLIGHT,
   FILE_TAB_REUSE,
