@@ -370,9 +370,11 @@ export const DIFF_PALETTE: ReTableEntry[] = [
 //
 // The user's message bubble, the composer and the pills above it (the diff
 // stat chip) are frosted instead: the theme's `surface2` (oxocarbon base01)
-// at 35%, darker than the hover white, over a light blur, so chat text
-// scrolling under the composer shows as soft shapes rather than a flat grey
-// slab (a 24px blur under a white tint read as opaque; 55% still too solid).
+// at 35%, darker than the hover white, so the surface stays see-through
+// rather than a flat grey slab (a white tint read as opaque; 55% still too
+// solid). The blur is 14px: at 5px, chat text scrolling under the composer
+// and chips stayed legible as ghost letters behind muted placeholder and
+// description text, and 10px still smeared word shapes through.
 //
 // Both are defined once on `:root` by FLOATING_SURFACES_CSS. Unistyles names a
 // theme var by hyphenating the key (`--colors-interaction-highlight`); the
@@ -381,7 +383,7 @@ export const DIFF_PALETTE: ReTableEntry[] = [
 const GLASS_FILL = "var(--paseo-glass-fill)";
 const GLASS_BLUR = "blur(24px) saturate(1.4)";
 const FROST_FILL = "var(--paseo-frost-fill)";
-const FROST_BLUR = "blur(5px) saturate(1.2)";
+const FROST_BLUR = "blur(14px) saturate(1.2)";
 // The composer's autocomplete floats over chat text, where the light frost
 // left the text behind legible enough to fight the suggestions. Same base01,
 // denser, under the floating-surface blur.
