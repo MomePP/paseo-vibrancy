@@ -207,8 +207,8 @@ version being built (`cachedPristine`).
    trailing scrim, kebab chip/gutter, resize handle, file tab reuse guard
    (`"file"===…nextTarget.kind&&!globalThis.__paseoOpenFilesInNewTab&&…`),
    navigator backdrop
-   (now `var(--paseo-pane-bg, transparent)`), oxocarbon ANSI, opaque-surfaces
-   stylesheet (`<style id="paseo-vibrancy-opaque-surfaces">`) + xterm
+   (now `var(--paseo-pane-bg, transparent)`), oxocarbon ANSI, floating-surfaces
+   stylesheet (`<style id="paseo-vibrancy-floating-surfaces">`, glass since 0.3.0) + xterm
    padding + workspace title weight (`font-weight: 500 !important` on
    `[data-testid="workspace-header-title"]`; stock is 300 from 720px up via
    a unistyles media rule; font smoothing deliberately left at stock

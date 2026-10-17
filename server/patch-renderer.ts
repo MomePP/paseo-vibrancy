@@ -15,6 +15,7 @@ import {
   DIFF_PALETTE,
   FRAME_RATE,
   FILE_TAB_REUSE,
+  FLOATING_SURFACES_CSS,
   GLASS_SURFACES,
   HANDLE_HIGHLIGHT,
   HOVER_HIGHLIGHT,
@@ -25,7 +26,6 @@ import {
   KEBAB_GUTTER,
   LABELS_LINE,
   NAVIGATOR_BACKDROP,
-  OPAQUE_SURFACES_CSS,
   PANE,
   RENDERER_PATCHES,
   SCRIM_COLOURS,
@@ -129,8 +129,8 @@ export function patchRenderer(src: string, term: TermMetrics): { src: string; no
   for (const { label, pattern, replacement } of DIFF_PALETTE) {
     patcher.replaceRe(label, pattern, replacement, 1);
   }
-  for (const { label, pattern, replacement } of GLASS_SURFACES) {
-    patcher.replaceRe(label, pattern, replacement, 1);
+  for (const { label, pattern, replacement, expect } of GLASS_SURFACES) {
+    patcher.replaceRe(label, pattern, replacement, expect);
   }
   for (const { label, pattern, replacement } of FRAME_RATE) {
     patcher.replaceRe(label, pattern, replacement, 1);
@@ -174,14 +174,14 @@ export function patchIndexHtml(html: string, padding: string): { html: string; n
     notes.push("ok      window wash (1x)");
   }
 
-  // The dim and the opaque-surfaces stylesheet are independent patches, so a
+  // The dim and the floating-surfaces stylesheet are independent patches, so a
   // miss on one must not skip the other.
   if (!src.includes("</head>")) {
-    notes.push("MISSED  opaque floating surfaces: no </head> to inject before");
+    notes.push("MISSED  glass floating surfaces: no </head> to inject before");
   } else {
-    const css = OPAQUE_SURFACES_CSS.replace("__PADDING__", padding);
+    const css = FLOATING_SURFACES_CSS.replace("__PADDING__", padding);
     src = src.replace("</head>", `${css}  </head>`);
-    notes.push("ok      opaque floating surfaces (1x)");
+    notes.push("ok      glass floating surfaces (1x)");
   }
 
   return { html: src, notes };

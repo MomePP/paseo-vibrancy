@@ -100,7 +100,7 @@ test("rendererPath throws when index.html references a bundle missing on disk", 
   }
 });
 
-test("patchIndexHtml rewrites the flash guard into the live color-mix wash and injects the opaque-surfaces style", () => {
+test("patchIndexHtml rewrites the flash guard into the live color-mix wash and injects the floating-surfaces style", () => {
   const html = "<head><style>html,\n body { background-color: #181b1a; }</style></head>";
   const { html: patched, notes } = patchIndexHtml(html, "0 0 0 10px");
   assert.ok(
@@ -108,15 +108,15 @@ test("patchIndexHtml rewrites the flash guard into the live color-mix wash and i
       "body { background-color: color-mix(in srgb, var(--colors-surface1, #181b1a) calc(var(--paseo-tint, 0.85) * 100%), transparent);",
     ),
   );
-  assert.ok(patched.indexOf('<style id="paseo-vibrancy-opaque-surfaces">') < patched.indexOf("</head>"));
+  assert.ok(patched.indexOf('<style id="paseo-vibrancy-floating-surfaces">') < patched.indexOf("</head>"));
   assert.ok(patched.includes("padding: 0 0 0 10px;"));
-  assert.deepEqual(notes, ["ok      window wash (1x)", "ok      opaque floating surfaces (1x)"]);
+  assert.deepEqual(notes, ["ok      window wash (1x)", "ok      glass floating surfaces (1x)"]);
 });
 
 test("patchIndexHtml reports a MISSED note when the flash guard is absent, without skipping the style injection", () => {
   const { notes } = patchIndexHtml("<head></head>", "0 0 0 10px");
   assert.ok(notes[0]!.startsWith("MISSED  window wash"));
-  assert.ok(notes[1]!.startsWith("ok      opaque floating surfaces"));
+  assert.ok(notes[1]!.startsWith("ok      glass floating surfaces"));
 });
 
 test("patchRenderer swaps the resize handle's accent to the subtle token in both occurrences", () => {
