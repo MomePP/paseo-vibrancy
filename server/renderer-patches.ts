@@ -398,10 +398,12 @@ export const GLASS_SURFACES: ReTableEntry[] = [
     replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}"$2`,
   },
   {
+    // No outline either, so the composer reads as the same frosted surface
+    // as the message bubble (an outline made the same fill look darker).
     label: "glass composer",
     pattern:
-      /(inputWrapper:Object\.assign\(\{flexShrink:1,flexDirection:"column",gap:[A-Za-z_$][\w$]*\.spacing\[3\],backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1/g,
-    replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}"`,
+      /(inputWrapper:Object\.assign\(\{flexShrink:1,flexDirection:"column",gap:[A-Za-z_$][\w$]*\.spacing\[3\],backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1,borderWidth:[A-Za-z_$][\w$]*\.borderWidth\[1\]/g,
+    replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}",borderWidth:0`,
   },
   {
     label: "glass composer pill",
