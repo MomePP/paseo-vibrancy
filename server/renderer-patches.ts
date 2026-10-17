@@ -149,8 +149,12 @@ export const KEBAB_GUTTER: ExpectedReTableEntry = {
 // glass fill, so the scrim is cleared and the label instead keeps a constant
 // gutter clear of the close button (18px, the button's own width), the way
 // KEBAB_GUTTER does for sidebar rows; constant so the label does not reflow
-// on hover. The fill patch runs after HOVER_HIGHLIGHT, which has already
-// turned `tabHovered` into `interactionHighlight`.
+// on hover. Paseo sizes each tab from an off-screen measurement of its label
+// and reserves nothing for the overlaid close button, so the measurement
+// carries the same gutter: without it every tab came out 18px too narrow
+// and truncated its own label ("Files" → "Fi…"). The fill patch runs after
+// HOVER_HIGHLIGHT, which has already turned `tabHovered` into
+// `interactionHighlight`.
 export const TAB_GLASS: ExpectedReTableEntry[] = [
   {
     label: "glass tab fills",
@@ -169,6 +173,20 @@ export const TAB_GLASS: ExpectedReTableEntry[] = [
     label: "tab label gutter",
     pattern: /(tabHandle:\{flexDirection:"row",alignItems:"center",gap:[A-Za-z_$][\w$]*\.spacing\[1\],flex:1,minWidth:0,userSelect:"none",)/g,
     replacement: "$1paddingRight:18,",
+    expect: 1,
+  },
+  {
+    label: "tab label gutter measured",
+    pattern: /tabLabelMeasurement:\{flexShrink:0\}/g,
+    replacement: "tabLabelMeasurement:{flexShrink:0,paddingRight:18}",
+    expect: 1,
+  },
+  {
+    // The 160px cap grows by the same 18px, so a long title keeps the text
+    // width stock gave it.
+    label: "tab max width with gutter",
+    pattern: /(minTabWidth:[\w$]+,maxTabWidth:)([\w$]+)(,tabIconWidth:)/g,
+    replacement: "$1$2+18$3",
     expect: 1,
   },
 ];
