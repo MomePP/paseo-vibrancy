@@ -418,7 +418,7 @@ export const DIFF_PALETTE: ExpectedReTableEntry[] = [
 // `surface2` hover, now the shared hover fill), the chat's scroll-to-bottom
 // button (stock `surface2`), an expanded tool call in the chat (`surface1`),
 // the composer's autocomplete list and detail card (`surface1` with an
-// outline, now frosted and borderless like the composer) and the active row
+// outline, now glass and borderless) and the active row
 // of menus, the autocomplete and comboboxes (opaque, now the hover glass).
 export const GLASS_SURFACES: ExpectedReTableEntry[] = [
   {
@@ -440,12 +440,12 @@ export const GLASS_SURFACES: ExpectedReTableEntry[] = [
     expect: 1,
   },
   {
-    // No outline either, so the composer reads as the same frosted surface
-    // as the message bubble (an outline made the same fill look darker).
+    // The stock `borderAccent` outline stays, so the composer keeps an edge
+    // against the frosted chat behind it.
     label: "glass composer",
     pattern:
-      /(inputWrapper:Object\.assign\(\{flexShrink:1,flexDirection:"column",gap:[A-Za-z_$][\w$]*\.spacing\[3\],backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1,borderWidth:[A-Za-z_$][\w$]*\.borderWidth\[1\]/g,
-    replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}",borderWidth:0`,
+      /(inputWrapper:Object\.assign\(\{flexShrink:1,flexDirection:"column",gap:[A-Za-z_$][\w$]*\.spacing\[3\],backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1(,borderWidth:[A-Za-z_$][\w$]*\.borderWidth\[1\])/g,
+    replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}"$2`,
     expect: 1,
   },
   {
