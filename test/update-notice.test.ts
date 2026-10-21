@@ -7,6 +7,7 @@ import type { VibrancyStatus } from "../shared/rpc.ts";
 
 function status(overrides: Partial<VibrancyStatus>): VibrancyStatus {
   return {
+    platform: "darwin",
     runningVersion: "0.11.1",
     runningVibrancyBuild: true,
     builtFrom: "0.11.1",
@@ -21,7 +22,7 @@ function status(overrides: Partial<VibrancyStatus>): VibrancyStatus {
   };
 }
 
-const release = (version: string) => ({ version, zipUrl: "", sha512: "", size: 0 });
+const release = (version: string) => ({ version, zipUrl: "", size: 0, algorithm: "sha512" as const, digest: "" });
 
 /** A client whose server status is whatever `current` holds, recording the sidebar titles currently mounted. */
 function fakeClient(initial: VibrancyStatus) {

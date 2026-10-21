@@ -1,6 +1,6 @@
 /**
- * `PV_JS` is the CommonJS source written to `Contents/Resources/pv.js` inside
- * the patched Paseo app bundle. It is loaded by the asar hook line
+ * `PV_JS` is the CommonJS source written to the patched copy's resources
+ * directory as `pv.js`. It is loaded by the asar hook line
  * (`server/asar.ts`'s `ASAR_HOOK_LINE`) while the first `BrowserWindow`'s
  * options object is still being evaluated — i.e. before any window exists —
  * so it runs entirely in Electron's main process and must be self-contained
@@ -8,29 +8,37 @@
  * below). A throw at load time would break Paseo's launch, so all load-time
  * work is wrapped in a single try/catch and `module.exports = true` is
  * guaranteed regardless of what happens inside it.
+ *
+ * macOS: `setVibrancy` plus the `blur.node` radius. Windows: the material
+ * goes to `setBackgroundMaterial` (fixed blur, no addon); the lists and
+ * defaults mirror `shared/vibrancy.ts`.
  */
 
 export const PV_JS = `"use strict";
 
-var MATERIALS = [
-  "none",
-  "sidebar",
-  "hud",
-  "under-window",
-  "fullscreen-ui",
-  "menu",
-  "popover",
-  "titlebar",
-  "header",
-  "sheet",
-  "window",
-  "content",
-  "under-page",
-  "selection",
-  "tooltip",
-];
+var IS_WINDOWS = process.platform === "win32";
 
-var DEFAULTS = { material: "none", blurRadius: 30, tint: 0.85, paneGlass: true };
+var MATERIALS = IS_WINDOWS
+  ? ["none", "acrylic", "mica", "tabbed"]
+  : [
+      "none",
+      "sidebar",
+      "hud",
+      "under-window",
+      "fullscreen-ui",
+      "menu",
+      "popover",
+      "titlebar",
+      "header",
+      "sheet",
+      "window",
+      "content",
+      "under-page",
+      "selection",
+      "tooltip",
+    ];
+
+var DEFAULTS = { material: IS_WINDOWS ? "acrylic" : "none", blurRadius: 30, tint: 0.85, paneGlass: true };
 
 function clampNumber(value, fallback, min, max) {
   if (typeof value !== "number" || !isFinite(value)) {
@@ -57,13 +65,15 @@ try {
   var path = require("path");
 
   var blur = null;
-  try {
-    var blurModule = { exports: {} };
-    process.dlopen(blurModule, path.join(__dirname, "blur.node"));
-    blur = blurModule.exports;
-  } catch (dlopenErr) {
-    console.error("[paseo-vibrancy] failed to load blur.node", dlopenErr);
-    blur = null;
+  if (!IS_WINDOWS) {
+    try {
+      var blurModule = { exports: {} };
+      process.dlopen(blurModule, path.join(__dirname, "blur.node"));
+      blur = blurModule.exports;
+    } catch (dlopenErr) {
+      console.error("[paseo-vibrancy] failed to load blur.node", dlopenErr);
+      blur = null;
+    }
   }
 
   function setBlur(handle, radius) {
@@ -100,6 +110,12 @@ try {
   var current = readSettings();
 
   function apply(win) {
+    if (IS_WINDOWS) {
+      if (win && typeof win.setBackgroundMaterial === "function") {
+        win.setBackgroundMaterial(current.material);
+      }
+      return;
+    }
     if (!win || typeof win.setVibrancy !== "function") {
       return;
     }

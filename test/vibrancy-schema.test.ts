@@ -13,9 +13,18 @@ test("parseVibrancy clamps out-of-range numeric fields", () => {
   assert.equal(result.tint, 0);
 });
 
-test("parseVibrancy falls back to default material for unknown values", () => {
-  const result = parseVibrancy({ material: "bogus" });
-  assert.equal(result.material, "none");
+test("parseVibrancy falls back to the platform's default material for unknown values", () => {
+  assert.equal(parseVibrancy({ material: "bogus" }, "darwin").material, "none");
+  assert.equal(parseVibrancy({ material: "bogus" }, "win32").material, "acrylic");
+});
+
+test("parseVibrancy keeps only the platform's own materials; the other OS's fall back to its default", () => {
+  assert.equal(parseVibrancy({ material: "hud" }, "darwin").material, "hud");
+  assert.equal(parseVibrancy({ material: "mica" }, "darwin").material, "none");
+  assert.equal(parseVibrancy({ material: "mica" }, "win32").material, "mica");
+  assert.equal(parseVibrancy({ material: "none" }, "win32").material, "none");
+  assert.equal(parseVibrancy({ material: "hud" }, "win32").material, "acrylic");
+  assert.equal(parseVibrancy("not json", "win32").material, "acrylic");
 });
 
 test("parseVibrancy never throws, returns defaults for non-object input", () => {

@@ -19,14 +19,25 @@
  * Bootstrapping from stock `/Applications/Paseo.app`, the *running* exe
  * differs from the *target* (`Paseo-Vibrancy.app`) exe the swap is about to
  * replace, so both are tracked: the wait only ends once neither matches.
+ *
+ * Windows: the same flow as a PowerShell script (`windowsSwapScript`),
+ * started so it outlives Paseo (see `startSwap`). It closes the main window of every process started
+ * from the target or running `Paseo.exe` (Paseo quits, daemon included, when
+ * it is closed), stops a daemon that outlives that with the old copy's
+ * `paseo.cmd`, and waits until no process runs from either exe — Windows
+ * will not move a folder while an exe inside it runs. The old copy goes to
+ * the Recycle Bin, and a Start menu shortcut points at the new one.
  */
 
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { HOST_PLATFORM } from "../shared/platform.ts";
+import type { HostPlatform } from "../shared/platform.ts";
 import { STAMP_NAME } from "./build.ts";
+import { WINDOWS_EXE, localAppData, resourcesDir } from "./layout.ts";
 
 export type SwapOpts = {
   staging: string;
@@ -39,9 +50,17 @@ export type SwapOpts = {
   quit: boolean;
   open: boolean;
   logPath?: string;
+  /** Windows: the shortcut to (re)write; defaults to `WINDOWS_SHORTCUT_NAME` in the Start menu's Programs folder. */
+  shortcutPath?: string;
 };
 
-export const DEFAULT_SWAP_LOG = join(homedir(), "Library", "Logs", "paseo-vibrancy-swap.log");
+export const DEFAULT_SWAP_LOG =
+  HOST_PLATFORM === "win32"
+    ? join(localAppData(), "paseo-vibrancy", "swap.log")
+    : join(homedir(), "Library", "Logs", "paseo-vibrancy-swap.log");
+
+/** The Start menu shortcut the Windows swap (re)writes for the patched copy. */
+const WINDOWS_SHORTCUT_NAME = "Paseo Vibrancy.lnk";
 
 /** How many 0.5s polls `swapScript` waits for the running app to quit — 60s total. */
 const QUIT_WAIT_ATTEMPTS = 120;
@@ -189,15 +208,139 @@ export function launchEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 }
 
 /**
+ * Quotes `s` as a PowerShell single-quoted string: no expansion inside, and
+ * every quote character doubled — PowerShell also ends a single-quoted
+ * string at the typographic quotes U+2018 to U+201B (`D’Angelo`).
+ */
+function psq(s: string): string {
+  return `'${s.replace(/['\u2018\u2019\u201A\u201B]/g, "$&$&")}'`;
+}
+
+/**
+ * Builds the PowerShell script `startSwap` runs detached on Windows; same
+ * contract as `swapScript`. With `quit`: close the main window of every
+ * process run from the target's or the running `Paseo.exe`, wait up to 20 s
+ * for them all to exit, stop a daemon still running (e.g. kept running after
+ * quit) with the old copy's `paseo.cmd`, wait up to 40 s more, and give up —
+ * reopening the previous app when `open` — if anything is still running.
+ * Then the old copy is renamed aside, staging is moved into place (the old
+ * copy is restored if that fails), the Start menu shortcut is rewritten, the
+ * new copy is launched if `open`, and only then does the old copy go to the
+ * Recycle Bin, so a stuck recycle can't hold up the relaunch.
+ */
+export function windowsSwapScript(opts: Omit<SwapOpts, "trashDir">): string {
+  const logPath = opts.logPath ?? DEFAULT_SWAP_LOG;
+  const targetExe = join(opts.target, WINDOWS_EXE);
+  const previousApp = opts.previousApp ?? opts.target;
+  const aside = `${opts.target}.previous-${Math.floor(Date.now() / 1000)}`;
+  const shortcut =
+    opts.shortcutPath !== undefined
+      ? psq(opts.shortcutPath)
+      : `(Join-Path ([Environment]::GetFolderPath('Programs')) ${psq(WINDOWS_SHORTCUT_NAME)})`;
+
+  const lines = [
+    `$log = ${psq(logPath)}`,
+    `New-Item -ItemType Directory -Force -Path (Split-Path -Parent $log) | Out-Null`,
+    `function Log($m) { Add-Content -LiteralPath $log -Value ("[{0}] swap: {1}" -f (Get-Date -Format o), $m) }`,
+    opts.open
+      ? `function Reopen { Log 'reopening previous app'; Start-Process -FilePath ${psq(join(previousApp, WINDOWS_EXE))} }`
+      : `function Reopen { }`,
+    `Log 'starting'`,
+  ];
+
+  if (opts.quit) {
+    const exes = [...new Set([targetExe, opts.runningExe ?? targetExe])].map(psq).join(", ");
+    const oldCli = join(previousApp, "resources", "bin", "paseo.cmd");
+    lines.push(
+      `$exes = @(${exes})`,
+      `function Running { @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and ($exes -contains $_.Path) }) }`,
+      `function WaitGone($polls) { for ($i = 0; $i -lt $polls -and (Running).Count -gt 0; $i++) { Start-Sleep -Milliseconds 500 } }`,
+      `Log 'requesting quit'`,
+      `Running | Where-Object { $_.MainWindowHandle -ne 0 } | ForEach-Object { [void]$_.CloseMainWindow() }`,
+      `WaitGone 40`,
+      `if ((Running).Count -gt 0 -and (Test-Path -LiteralPath ${psq(oldCli)})) {`,
+      `  Log 'stopping the previous daemon'`,
+      `  & ${psq(oldCli)} daemon stop --timeout 15 --force`,
+      `  if ($LASTEXITCODE -ne 0) { Log 'daemon stop failed, continuing' }`,
+      `  WaitGone 80`,
+      `}`,
+      `if ((Running).Count -gt 0) { Log 'quit wait timed out'; Reopen; exit 1 }`,
+    );
+  }
+
+  lines.push(
+    `$aside = ${psq(aside)}`,
+    `if (Test-Path -LiteralPath ${psq(opts.target)}) {`,
+    `  Log 'moving previous app aside'`,
+    `  try { Move-Item -LiteralPath ${psq(opts.target)} -Destination $aside -ErrorAction Stop }`,
+    `  catch { Log "move aside failed: $_"; Reopen; exit 1 }`,
+    `}`,
+    `Log 'moving staging into place'`,
+    `try { Move-Item -LiteralPath ${psq(opts.staging)} -Destination ${psq(opts.target)} -ErrorAction Stop }`,
+    `catch {`,
+    `  Log "staging move failed, restoring previous app: $_"`,
+    `  if (Test-Path -LiteralPath $aside) {`,
+    `    try { Move-Item -LiteralPath $aside -Destination ${psq(opts.target)} -ErrorAction Stop }`,
+    `    catch { Log "restore failed, previous app left at $($aside): $_" }`,
+    `  }`,
+    `  Reopen; exit 1`,
+    `}`,
+    `try {`,
+    `  $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut(${shortcut})`,
+    `  $shortcut.TargetPath = ${psq(targetExe)}`,
+    `  $shortcut.WorkingDirectory = ${psq(opts.target)}`,
+    `  $shortcut.Save()`,
+    `} catch { Log "shortcut failed: $_" }`,
+  );
+  if (opts.open) {
+    lines.push(`Log 'opening updated app'`, `Start-Process -FilePath ${psq(targetExe)}`);
+  }
+  lines.push(
+    `if (Test-Path -LiteralPath $aside) {`,
+    `  Log 'moving previous app to the Recycle Bin'`,
+    `  try { Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($aside, 'OnlyErrorDialogs', 'SendToRecycleBin') }`,
+    `  catch { Log "recycling failed, previous app left at $($aside): $_" }`,
+    `}`,
+    `Log 'complete'`,
+  );
+
+  return lines.join("\n") + "\n";
+}
+
+/**
  * Validates `staging` carries a build stamp (a stamp ending in `missed` is
  * still swappable — MISSED patches are cosmetic, not a reason to block a
- * rebuild) and spawns `swapScript`'s output detached: own process group, no
- * inherited stdio, surviving both this process and Paseo's daemon exiting.
+ * rebuild) and starts the swap script so it outlives this process and
+ * Paseo's daemon, with no inherited stdio. macOS: `/bin/sh`, detached into
+ * its own process group. Windows: see below; the script runs from the temp
+ * directory, so its working directory never pins a folder it has to move.
  */
-export function startSwap(opts: Omit<SwapOpts, "trashDir"> & { trashDir?: string }): void {
-  const stampPath = join(opts.staging, "Contents", "Resources", STAMP_NAME);
+export function startSwap(
+  opts: Omit<SwapOpts, "trashDir"> & { trashDir?: string },
+  platform: HostPlatform = HOST_PLATFORM,
+): void {
+  const stampPath = join(resourcesDir(opts.staging, platform), STAMP_NAME);
   if (!existsSync(stampPath)) {
     throw new Error("staging has no build stamp");
+  }
+
+  if (platform === "win32") {
+    // Neither the obvious detached PowerShell (`detached` means no console,
+    // and PowerShell then exits 0 without running anything) nor a detached
+    // Node runner (that is Paseo.exe itself, running from the very folder
+    // the swap waits on and moves) works. A short-lived hidden PowerShell
+    // starts the real one with Start-Process instead: libuv lets processes
+    // its children create break away from its kill-on-close job, so the
+    // script survives Paseo quitting, and it gets a hidden console of its own.
+    const encoded = Buffer.from(windowsSwapScript(opts), "utf16le").toString("base64");
+    const launch = `Start-Process -FilePath powershell.exe -WindowStyle Hidden -ArgumentList '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-EncodedCommand','${encoded}'`;
+    spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", launch], {
+      stdio: "ignore",
+      windowsHide: true,
+      cwd: tmpdir(),
+      env: launchEnv(process.env),
+    }).unref();
+    return;
   }
 
   const trashDir = opts.trashDir ?? join(homedir(), ".Trash");

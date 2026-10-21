@@ -1,3 +1,6 @@
+import { HOST_PLATFORM } from "./platform.ts";
+import type { HostPlatform } from "./platform.ts";
+
 /**
  * The build's steps in run order, shared by the server (which reports
  * progress through them) and the client (which labels the progress bar).
@@ -22,10 +25,15 @@ export type BuildProgress = {
   detail: string | null;
 };
 
+/** macOS-only steps: Windows builds are unsigned and have no blur addon. */
+const MAC_ONLY_STEPS: readonly BuildStepId[] = ["verify", "compile", "sign"];
+
 /** The steps a build runs: from `download` when no pristine copy is cached, else from `copy`. */
-export function buildPlan(needsDownload: boolean): BuildStepId[] {
+export function buildPlan(needsDownload: boolean, platform: HostPlatform = HOST_PLATFORM): BuildStepId[] {
   const first = BUILD_STEPS.findIndex((s) => s.id === (needsDownload ? "download" : "copy"));
-  return BUILD_STEPS.slice(first).map((s) => s.id);
+  return BUILD_STEPS.slice(first)
+    .map((s) => s.id)
+    .filter((id) => platform === "darwin" || !MAC_ONLY_STEPS.includes(id));
 }
 
 /**
