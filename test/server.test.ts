@@ -5,28 +5,40 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { BuildQueue, createHandlers } from "../index.server.ts";
+import { resourcesDir } from "../server/layout.ts";
 import { readSettings, writeSettings } from "../server/settings-file.ts";
 import { isVibrancyBuild, runningBundle } from "../server/status.ts";
-import { TERMINAL_DEFAULTS, VIBRANCY_DEFAULTS } from "../shared/vibrancy.ts";
-import { BUILD_STEPS } from "../shared/build-progress.ts";
+import { TERMINAL_DEFAULTS, VIBRANCY_DEFAULTS, materialsFor } from "../shared/vibrancy.ts";
+import { HOST_PLATFORM } from "../shared/platform.ts";
+import { BUILD_STEPS, buildPlan } from "../shared/build-progress.ts";
 import type { BuildStepId } from "../shared/build-progress.ts";
 import { buildFingerprint, stampFor } from "../server/build.ts";
 import { resolveTerm } from "../server/ghostty.ts";
+import { fakeInstall } from "./fake-install.ts";
 
-/** Overall fraction at which `id` starts within `plan`, from the step weights. */
-function stepStart(plan: readonly BuildStepId[], id: BuildStepId): number {
+/** Overall fraction at which `id` starts within `plan`, from the step weights; 1 past the last step. */
+function stepStart(plan: readonly BuildStepId[], id: BuildStepId | undefined): number {
   const planned = BUILD_STEPS.filter((s) => plan.includes(s.id));
   const total = planned.reduce((sum, s) => sum + s.weight, 0);
-  const before = planned.slice(0, planned.findIndex((s) => s.id === id));
+  const index = planned.findIndex((s) => s.id === id);
+  const before = index === -1 ? planned : planned.slice(0, index);
   return before.reduce((sum, s) => sum + s.weight, 0) / total;
 }
+
+/** The step after `id` in `plan`, or undefined when `id` is last. */
+function nextStep(plan: readonly BuildStepId[], id: BuildStepId): BuildStepId | undefined {
+  return plan[plan.indexOf(id) + 1];
+}
+
+/** A material this host's schema accepts other than the default. */
+const OTHER_MATERIAL = materialsFor(HOST_PLATFORM).find((material) => material !== VIBRANCY_DEFAULTS.material)!;
 
 test("writeSettings then readSettings round-trips", () => {
   const dir = mkdtempSync(join(tmpdir(), "vibrancy-file-"));
   const file = join(dir, "paseo-vibrancy.json");
   try {
     const settings = {
-      material: "hud" as const,
+      material: OTHER_MATERIAL,
       blurRadius: 12,
       tint: 0.4,
       paneGlass: false,
@@ -51,17 +63,26 @@ test("readSettings on missing file falls back to defaults", () => {
 
 test("runningBundle resolves the outermost .app, not a nested helper", () => {
   const execPath = "/Users/x/Applications/Paseo-Vibrancy.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper";
-  assert.equal(runningBundle(execPath), "/Users/x/Applications/Paseo-Vibrancy.app");
+  assert.equal(runningBundle(execPath, "darwin"), "/Users/x/Applications/Paseo-Vibrancy.app");
 });
 
 test("runningBundle returns null when no segment ends in .app", () => {
-  assert.equal(runningBundle("/usr/local/bin/node"), null);
+  assert.equal(runningBundle("/usr/local/bin/node", "darwin"), null);
+});
+
+test("runningBundle on Windows is the folder holding Paseo.exe, whatever its case, and null for plain Node", () => {
+  assert.equal(
+    runningBundle("C:\\Users\\x\\AppData\\Local\\Programs\\Paseo-Vibrancy\\Paseo.exe", "win32"),
+    "C:\\Users\\x\\AppData\\Local\\Programs\\Paseo-Vibrancy",
+  );
+  assert.equal(runningBundle("C:\\Program Files\\Paseo\\PASEO.EXE", "win32"), "C:\\Program Files\\Paseo");
+  assert.equal(runningBundle("C:\\Program Files\\nodejs\\node.exe", "win32"), null);
 });
 
 test("isVibrancyBuild is false for a dir without a stamp", () => {
   const dir = mkdtempSync(join(tmpdir(), "vibrancy-bundle-"));
   try {
-    mkdirSync(join(dir, "Contents", "Resources"), { recursive: true });
+    mkdirSync(resourcesDir(dir), { recursive: true });
     assert.equal(isVibrancyBuild(dir), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -234,19 +255,17 @@ test("status reports the build step a running rebuild is in, past the previous s
         onStep?.("copy");
         onStep?.("patch");
         await pending;
-        onStep?.("compile");
-        onStep?.("sign");
         return { report: ["ok      fake"], missed: false };
       },
     });
 
     await handlers.build({ version: "1.2.3", restart: false });
     const { progress } = await handlers.status();
-    const plan: BuildStepId[] = ["copy", "patch", "compile", "sign"];
+    const plan = buildPlan(false);
     assert.equal(progress?.step, "patch");
     assert.equal(progress.detail, null);
     assert.ok(progress.fraction > stepStart(plan, "copy"), `${progress.fraction}`);
-    assert.ok(progress.fraction < stepStart(plan, "compile"), `${progress.fraction}`);
+    assert.ok(progress.fraction < stepStart(plan, nextStep(plan, "patch")), `${progress.fraction}`);
 
     release();
     await handlers.queue.whenIdle();
@@ -265,7 +284,7 @@ test("status reports download progress, weighted into the whole update, while a 
       settingsFile: join(dir, "paseo-vibrancy.json"),
       execPath: "/usr/local/bin/node",
       cachedPristine: () => null,
-      fetchRelease: async (version) => ({ version, zipUrl: "http://127.0.0.1:1/x.zip", sha512: "x", size: 186e6 }),
+      fetchRelease: async (version) => ({ version, zipUrl: "http://127.0.0.1:1/x.zip", size: 186e6, algorithm: "sha512" as const, digest: "x" }),
       downloadVerified: async (_release, _cacheDir, onProgress) => {
         onProgress?.("download", 0.45, "84 / 186 MB");
         reachedDownload();
@@ -278,7 +297,7 @@ test("status reports download progress, weighted into the whole update, while a 
     await handlers.build({ version: "1.2.3", restart: false });
     await downloading;
     const { progress } = await handlers.status();
-    const plan: BuildStepId[] = ["download", "extract", "verify", "copy", "patch", "compile", "sign"];
+    const plan = buildPlan(true);
     assert.equal(progress?.step, "download");
     assert.equal(progress.detail, "84 / 186 MB");
     assert.ok(progress.fraction > stepStart(plan, "download"), `${progress.fraction}`);
@@ -324,7 +343,7 @@ test("a successful restart build leaves progress on the restart step", async () 
       cachedPristine: () => join(dir, "pristine.app"),
       buildStaging: async ({ onStep }) => {
         onStep?.("copy");
-        onStep?.("sign");
+        onStep?.("patch");
         return { report: ["ok      fake"], missed: false };
       },
       startSwap: () => {},
@@ -341,16 +360,12 @@ test("a successful restart build leaves progress on the restart step", async () 
 test("build handler defaults version to the running bundle's version when none is requested", async () => {
   const dir = mkdtempSync(join(tmpdir(), "vibrancy-handlers-"));
   try {
-    const bundle = join(dir, "Paseo.app");
-    mkdirSync(join(bundle, "Contents", "Resources"), { recursive: true });
-    mkdirSync(join(bundle, "Contents", "MacOS"), { recursive: true });
-    const plist = `<?xml version="1.0"?><plist><dict><key>CFBundleShortVersionString</key><string>1.2.3</string></dict></plist>`;
-    writeFileSync(join(bundle, "Contents", "Info.plist"), plist, "utf8");
+    const { execPath } = fakeInstall(dir, "1.2.3");
 
     const requestedVersions: Array<string | undefined> = [];
     const handlers = createHandlers({
       settingsFile: join(dir, "paseo-vibrancy.json"),
-      execPath: join(bundle, "Contents", "MacOS", "Paseo"),
+      execPath,
       cachedPristine: (version) => {
         requestedVersions.push(version);
         return join(dir, "pristine.app");
@@ -368,18 +383,38 @@ test("build handler defaults version to the running bundle's version when none i
   }
 });
 
+test("restart hands startSwap the running install's executable and the install to reopen", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "vibrancy-handlers-"));
+  try {
+    const { app, execPath } = fakeInstall(dir, "1.2.3");
+    const swaps: Array<{ runningExe?: string; previousApp?: string }> = [];
+    const handlers = createHandlers({
+      settingsFile: join(dir, "paseo-vibrancy.json"),
+      execPath,
+      cachedPristine: () => join(dir, "pristine.app"),
+      buildStaging: async () => ({ report: ["ok      fake"], missed: false }),
+      startSwap: ({ runningExe, previousApp }) => {
+        swaps.push({ runningExe, previousApp });
+      },
+    });
+
+    await handlers.build({ restart: true });
+    await handlers.queue.whenIdle();
+
+    assert.deepEqual(swaps, [{ runningExe: execPath, previousApp: app }]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("status reflects an injected non-vibrancy running bundle", async () => {
   const dir = mkdtempSync(join(tmpdir(), "vibrancy-handlers-"));
   try {
-    const bundle = join(dir, "Paseo.app");
-    mkdirSync(join(bundle, "Contents", "Resources"), { recursive: true });
-    mkdirSync(join(bundle, "Contents", "MacOS"), { recursive: true });
-    const plist = `<?xml version="1.0"?><plist><dict><key>CFBundleShortVersionString</key><string>1.2.3</string></dict></plist>`;
-    writeFileSync(join(bundle, "Contents", "Info.plist"), plist, "utf8");
+    const { execPath } = fakeInstall(dir, "1.2.3");
 
     const handlers = createHandlers({
       settingsFile: join(dir, "paseo-vibrancy.json"),
-      execPath: join(bundle, "Contents", "MacOS", "Paseo"),
+      execPath,
     });
 
     const status = await handlers.status();
@@ -403,7 +438,7 @@ test("getSettings/setSettings round-trip through the handlers", async () => {
     assert.deepEqual(await handlers.getSettings(), VIBRANCY_DEFAULTS);
 
     const settings = {
-      material: "sidebar" as const,
+      material: OTHER_MATERIAL,
       blurRadius: 20,
       tint: 0.6,
       paneGlass: false,
@@ -418,10 +453,28 @@ test("getSettings/setSettings round-trip through the handlers", async () => {
   }
 });
 
+test("setSettings narrows a material from the other OS to this host's default, and status names the host's OS", async () => {
+  // A client on another device (a browser, a phone) offers its own idea of
+  // the materials; what gets saved must still be one this host can apply.
+  const dir = mkdtempSync(join(tmpdir(), "vibrancy-handlers-"));
+  try {
+    const handlers = createHandlers({ settingsFile: join(dir, "paseo-vibrancy.json"), execPath: "/usr/local/bin/node" });
+    const foreign = HOST_PLATFORM === "win32" ? "hud" : "mica";
+
+    const written = await handlers.setSettings({ ...VIBRANCY_DEFAULTS, material: foreign, tint: 0.4 });
+    assert.equal(written.material, VIBRANCY_DEFAULTS.material);
+    assert.equal(written.tint, 0.4);
+    assert.deepEqual(readSettings(join(dir, "paseo-vibrancy.json")), written);
+    assert.equal((await handlers.status()).platform, HOST_PLATFORM);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("checkUpdate handler records the release for status to report as latest", async () => {
   const dir = mkdtempSync(join(tmpdir(), "vibrancy-handlers-"));
   try {
-    const release = { version: "9.9.9", zipUrl: "https://example.com/x.zip", sha512: "abc", size: 1 };
+    const release = { version: "9.9.9", zipUrl: "https://example.com/x.zip", size: 1, algorithm: "sha512" as const, digest: "abc" };
     const handlers = createHandlers({
       settingsFile: join(dir, "paseo-vibrancy.json"),
       execPath: "/usr/local/bin/node",
@@ -439,19 +492,15 @@ test("checkUpdate handler records the release for status to report as latest", a
 test("status: saving a different terminal setting makes fingerprintMatches false for an old stamp", async () => {
   const dir = mkdtempSync(join(tmpdir(), "vibrancy-handlers-"));
   try {
-    const bundle = join(dir, "Paseo.app");
-    mkdirSync(join(bundle, "Contents", "Resources"), { recursive: true });
-    mkdirSync(join(bundle, "Contents", "MacOS"), { recursive: true });
-    const plist = `<?xml version="1.0"?><plist><dict><key>CFBundleShortVersionString</key><string>1.2.3</string></dict></plist>`;
-    writeFileSync(join(bundle, "Contents", "Info.plist"), plist, "utf8");
+    const { app, execPath } = fakeInstall(dir, "1.2.3");
 
     const ghosttyPath = join(dir, "no-ghostty");
     const fingerprint = buildFingerprint(resolveTerm(TERMINAL_DEFAULTS, ghosttyPath).term);
-    writeFileSync(join(bundle, "Contents", "Resources", ".vibrancy-build"), stampFor("1.2.3", fingerprint) + "\n", "utf8");
+    writeFileSync(join(resourcesDir(app), ".vibrancy-build"), stampFor("1.2.3", fingerprint) + "\n", "utf8");
 
     const handlers = createHandlers({
       settingsFile: join(dir, "paseo-vibrancy.json"),
-      execPath: join(bundle, "Contents", "MacOS", "Paseo"),
+      execPath,
       ghosttyPath,
     });
 

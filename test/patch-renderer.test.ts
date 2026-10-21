@@ -8,6 +8,7 @@ import { patchIndexHtml, patchRenderer, rendererPath } from "../server/patch-ren
 import { PatchCountError } from "../server/patch-engine.ts";
 import { BUILD_TABLES, PANE, SCRIM_COLOURS } from "../server/renderer-patches.ts";
 import type { TermMetrics } from "../server/ghostty.ts";
+import { resourcesDir } from "../server/layout.ts";
 
 const DEFAULT_TERM: TermMetrics = {
   fontSize: 13.5,
@@ -77,7 +78,7 @@ test("patchRenderer skips the settings-sync site when fontFamily and fontSize ar
 test("rendererPath resolves the single hashed bundle index.html references", () => {
   const app = mkdtempSync(join(tmpdir(), "vibrancy-renderer-path-"));
   try {
-    const webDist = join(app, "Contents", "Resources", "app-dist");
+    const webDist = join(resourcesDir(app), "app-dist");
     const jsDir = join(webDist, "_expo", "static", "js", "web");
     mkdirSync(jsDir, { recursive: true });
     writeFileSync(join(webDist, "index.html"), '<script src="/_expo/static/js/web/index-abc123.js"></script>');
@@ -91,7 +92,7 @@ test("rendererPath resolves the single hashed bundle index.html references", () 
 test("rendererPath throws when index.html references a bundle missing on disk", () => {
   const app = mkdtempSync(join(tmpdir(), "vibrancy-renderer-path-"));
   try {
-    const webDist = join(app, "Contents", "Resources", "app-dist");
+    const webDist = join(resourcesDir(app), "app-dist");
     mkdirSync(webDist, { recursive: true });
     writeFileSync(join(webDist, "index.html"), '<script src="/_expo/static/js/web/index-abc123.js"></script>');
     assert.throws(() => rendererPath(app), /missing on disk/);

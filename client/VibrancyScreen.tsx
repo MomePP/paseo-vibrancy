@@ -27,7 +27,8 @@ import {
 import { useToast } from "@getpaseo/plugin/client/react-native";
 
 import { BUILD_STEPS } from "../shared/build-progress.ts";
-import { VIBRANCY_DEFAULTS, MATERIALS, TERMINAL_DEFAULTS } from "../shared/vibrancy.ts";
+import { VIBRANCY_DEFAULTS, TERMINAL_DEFAULTS, materialsFor } from "../shared/vibrancy.ts";
+import type { Material } from "../shared/vibrancy.ts";
 import type { VibrancySettings } from "../shared/vibrancy.ts";
 import { buildRpc, checkUpdateRpc, getSettingsRpc, setSettingsRpc, statusRpc } from "../shared/rpc.ts";
 import type { VibrancyStatus } from "../shared/rpc.ts";
@@ -43,14 +44,14 @@ const BLUR_STEPS = [0, 10, 20, 30, 40, 50, 60];
 /** `0-100%` for the tint slider's native-platform fallback. */
 const TINT_STEPS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
-const MATERIAL_OPTIONS = MATERIALS.map((material) => ({
+const materialOption = (material: Material) => ({
   // "under-window" -> "Under Window": humanize the hyphenated material id.
   label: material
     .split("-")
     .map((word) => word[0]!.toUpperCase() + word.slice(1))
     .join(" "),
   value: material,
-}));
+});
 
 const range = (min: number, max: number, step: number) =>
   Array.from({ length: Math.round((max - min) / step) + 1 }, (_, i) => Math.round((min + i * step) * 1000) / 1000);
@@ -255,11 +256,12 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
         <SettingsSelect
           label="Material"
           value={settings.material}
-          options={MATERIAL_OPTIONS}
+          options={(status ? materialsFor(status.platform) : [settings.material]).map(materialOption)}
           onValueChange={(material) => updateSettings({ ...settings, material })}
           disabled={appearanceDisabled}
         />
-        {isWeb ? (
+        {/* The host's OS, not this device's: Windows' background materials have a fixed blur, no radius to set. */}
+        {status?.platform === "darwin" && (isWeb ? (
           <RangeRow
             label="Blur radius"
             value={settings.blurRadius}
@@ -278,7 +280,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
             onValueChange={(v) => updateSettings({ ...settings, blurRadius: Number(v) })}
             disabled={blurDisabled}
           />
-        )}
+        ))}
         {isWeb ? (
           <RangeRow
             label="Tint"

@@ -20,7 +20,8 @@ import { join } from "node:path";
 import type { PluginServerContext } from "@getpaseo/plugin/server";
 import type { PluginCleanup } from "@getpaseo/plugin";
 
-import { DEFAULT_STAGING, appVersion, buildFingerprint, buildStaging as buildStagingDefault, execName } from "./server/build.ts";
+import { DEFAULT_STAGING, buildFingerprint, buildStaging as buildStagingDefault } from "./server/build.ts";
+import { appExecutable, appVersion, assertWindowsBlurSupported, localAppData } from "./server/layout.ts";
 import { DEFAULT_SETTINGS_FILE, readSettings, writeSettings } from "./server/settings-file.ts";
 import { resolveTerm } from "./server/ghostty.ts";
 import {
@@ -36,9 +37,14 @@ import { buildPlan, overallFraction } from "./shared/build-progress.ts";
 import type { BuildProgress, BuildStepId } from "./shared/build-progress.ts";
 import { buildRpc, checkUpdateRpc, getSettingsRpc, setSettingsRpc, statusRpc } from "./shared/rpc.ts";
 import type { Release } from "./shared/rpc.ts";
+import { parseVibrancy } from "./shared/vibrancy.ts";
 import type { VibrancySettings } from "./shared/vibrancy.ts";
+import { HOST_PLATFORM } from "./shared/platform.ts";
 
-export const DEFAULT_TARGET = join(homedir(), "Applications", "Paseo-Vibrancy.app");
+export const DEFAULT_TARGET =
+  HOST_PLATFORM === "win32"
+    ? join(localAppData(), "Programs", "Paseo-Vibrancy")
+    : join(homedir(), "Applications", "Paseo-Vibrancy.app");
 
 /** Single-flight guard: a second `run` while one is pending rejects immediately, never queues. */
 export class BuildQueue {
@@ -133,6 +139,7 @@ export function createHandlers(deps: VibrancyHandlerDeps = {}) {
     }
     const { term, overriddenByGhostty } = resolveTerm(readSettings(settingsFile).terminal, ghosttyPath);
     return {
+      platform: HOST_PLATFORM,
       runningVersion,
       runningVibrancyBuild: bundle !== null && isVibrancyBuild(bundle),
       builtFrom: stamp?.version ?? null,
@@ -168,6 +175,9 @@ export function createHandlers(deps: VibrancyHandlerDeps = {}) {
    */
   async function runBuildJob(input: BuildInput): Promise<void> {
     try {
+      if (HOST_PLATFORM === "win32") {
+        assertWindowsBlurSupported();
+      }
       const bundle = runningBundle(execPath);
       const version = input.version ?? (bundle ? appVersion(bundle) : undefined);
       if (!version) {
@@ -184,7 +194,7 @@ export function createHandlers(deps: VibrancyHandlerDeps = {}) {
       lastReport = report;
       lastError = null;
       if (input.restart) {
-        const runningExe = bundle ? join(bundle, "Contents", "MacOS", execName(bundle)) : undefined;
+        const runningExe = bundle ? appExecutable(bundle) : undefined;
         doStartSwap({ staging, target, quit: true, open: true, runningExe, previousApp: bundle ?? undefined });
         progress = { step: "restart", fraction: 1, detail: null };
       } else {
@@ -216,9 +226,11 @@ export function createHandlers(deps: VibrancyHandlerDeps = {}) {
     return readSettings(settingsFile);
   }
 
+  /** The client may offer the other OS's materials (it can run on another device), so narrow to this host's before saving. */
   async function setSettings(settings: VibrancySettings): Promise<VibrancySettings> {
-    writeSettings(settings, settingsFile);
-    return settings;
+    const parsed = parseVibrancy(settings);
+    writeSettings(parsed, settingsFile);
+    return parsed;
   }
 
   return { status, checkUpdate, build, getSettings, setSettings, queue };

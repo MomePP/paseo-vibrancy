@@ -147,10 +147,10 @@ keeps Paseo's own settings-sync behaviour for size.
 
 | RPC | Input | Output |
 | --- | --- | --- |
-| `vibrancy.status` | — | running version, built-from version, fingerprint match, `ghosttyOverrides` (term keys the Ghostty config currently overrides), latest known release, last build report, last build error, `building`, `progress` (`{ step, fraction, detail }` or `null`; see "Build is asynchronous") |
-| `vibrancy.check-update` | — | latest release `{version, zipUrl, sha512, size}` or `null`, plus an error string |
+| `vibrancy.status` | — | host `platform` (`darwin`/`win32`), running version, built-from version, fingerprint match, `ghosttyOverrides` (term keys the Ghostty config currently overrides), latest known release, last build report, last build error, `building`, `progress` (`{ step, fraction, detail }` or `null`; see "Build is asynchronous") |
+| `vibrancy.check-update` | - | latest release `{version, zipUrl, size, algorithm, digest}` (`digest` hex; `sha512` on macOS, `sha256` on Windows) or `null`, plus an error string |
 | `vibrancy.build` | `{ version?: string, restart: boolean }` | `{ ok, report: [], error }` — returns immediately once queued (see "Build is asynchronous" below), never waits for the build itself |
-| `vibrancy.get-settings` / `vibrancy.set-settings` | settings (appearance + `terminal`) | settings |
+| `vibrancy.get-settings` / `vibrancy.set-settings` | settings (appearance + `terminal`) | settings; the RPC schema accepts either OS's materials and `set-settings` narrows to the host's own before saving |
 
 **Gotcha: RPC names must be lowercase.** `defineRpc` throws on a camelCase
 `name` — the SDK enforces a lowercase-with-dots pattern, pinned by a
@@ -174,9 +174,9 @@ wrong silently produces a theme that applies but reads wrong.
 2. Fetch that tag's `beta-mac.yml` (fall back to `latest-mac.yml`); hand-roll
    the electron-builder yml just far enough to pull the `Paseo-<ver>-arm64.zip`
    entry's `sha512`/`size` out of its `files:` list (no YAML dependency — the
-   format is small and fixed).
+   format is small and fixed). The base64 sha512 becomes a hex `digest`.
 3. Download to `~/Library/Caches/paseo-vibrancy/`, hashing while streaming
-   (zips run ~186 MB; nothing is buffered in memory). Size and base64 sha512
+   (zips run ~186 MB; nothing is buffered in memory). Size and digest
    must both match what the yml published, or the download is rejected and
    the cache dir is left exactly as found.
 4. `ditto -x -k` the zip, then
@@ -466,3 +466,59 @@ clean build reports zero `lastReport` lines starting with `MISSED`,
 `lastError` is `null`, and
 `codesign --verify --deep --strict ~/Applications/.Paseo-Vibrancy.staging.app`
 exits 0.
+
+## Windows (since the `feature/windows-support` port, Paseo 0.12.0)
+
+Verified on Windows 11 build 26300 against Paseo 0.12.0 x64; the whole
+Install → Rebuild & restart → copy launches → live settings flow ran end to
+end in an isolated instance.
+
+| Topic | Fact |
+| --- | --- |
+| Platform switch | `shared/platform.ts` `HOST_PLATFORM` is `process.platform`, meaningful on the server only. The client can run on another device than the host (browser, phone), so it takes the host's OS from `vibrancy.status.platform` for the material list and the blur-radius row, and the RPC settings schema accepts both OSes' materials. Everything platform-specific on the server takes an optional `platform` argument defaulting to `HOST_PLATFORM`, so tests can drive the other OS's branch. |
+| Install layout | `server/layout.ts`: the install is the folder holding `Paseo.exe`; `resources/` replaces `Contents/Resources`. Every Paseo process (app, daemon, plugin server) runs `Paseo.exe`, so `runningBundle` is just its folder. |
+| Version | No Info.plist: `appVersion` reads `package.json` out of `resources/app.asar` by parsing the asar header (16-byte prefix, header JSON length at byte 12, file data at `8 + headerSize + offset`). |
+| Release asset | `Paseo-Setup-<v>-{x64,arm64}.zip`, its root is the install itself. No yml lists it; the GitHub API's `assets[].digest` (`sha256:<hex>`) and `size` are the only integrity check, and there is no identity check (builds are unsigned). `Release` carries `algorithm` + hex `digest` for both platforms. Extract with `%SystemRoot%\System32\tar.exe`, never `tar` from PATH (Git's GNU tar can't read zips). |
+| Asar integrity | Windows Electron has no plist hash to update. The build reads the fuse wire (sentinel `dL7pKGdnNz796PbbjQWNKmHXBZaB9tsX`, version byte 1, count, one ASCII byte per fuse) out of `Paseo.exe` and refuses unless `EnableEmbeddedAsarIntegrityValidation` (index 4) is `0`. 0.12.0: `101100011`. |
+| Copy | `copyTree` through `original-fs`, so `app.asar` is copied as a file under the daemon's asar-patched fs (`test/electron-fs.test.ts` runs this under the real `Paseo.exe`). No compile or sign step; `buildPlan` drops `verify`, `compile`, `sign` on Windows. |
+| Material | `setBackgroundMaterial` (`none`, `acrylic`, `mica`, `tabbed`), default `acrylic`; needs Windows 11 22H2 (build 22621). `assertWindowsBlurSupported` refuses older builds before any download. The registry `ProductName` says "Windows 10" on Windows 11: use the build number. The client hides the blur radius row. A material from the other OS's list parses to this OS's default. |
+| Window | `frame: false`, transparent: square corners (electron#47510). No `WS_THICKFRAME`, but Electron answers `WM_NCHITTEST` with the resize codes at the edges. Maximize works; `ShowWindow(SW_MAXIMIZE)` overhangs the screen by 7 DIP. |
+| Quit | `CloseMainWindow()` on the main `Paseo.exe` quits the whole tree, daemon and plugin server included, within about a second (with `keepRunningAfterQuit` false). |
+
+### Gotchas: starting the swap script on Windows
+
+- **A detached PowerShell does nothing.** Node's `detached: true` is
+  `DETACHED_PROCESS`: no console at all, and `powershell.exe` then exits 0
+  without running its script. Confirmed with a marker-file script.
+- **A detached Node runner pins the folder.** `process.execPath` in the plugin
+  server is `Paseo.exe` of the running copy. Running the swap through it makes
+  the swap wait on (and be unable to move) its own executable: the quit wait
+  timed out with that runner as the one process left.
+- **What works:** a non-detached, hidden PowerShell runs `Start-Process
+  powershell.exe -WindowStyle Hidden ... -EncodedCommand`. libuv's job object
+  has silent breakaway, so the grandchild survives the plugin server and
+  Paseo quitting, and it gets a hidden console. Its working directory is the
+  temp dir, so it never pins a folder it has to move.
+- Paths are passed as PowerShell single-quoted strings (`'` doubled); the
+  scripts are tested with apostrophes, spaces and `$(...)` in paths.
+- The old copy is renamed aside, then sent to the Recycle Bin
+  (`Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory`); the Start menu
+  shortcut `Paseo Vibrancy.lnk` is rewritten on every swap.
+
+### Testing on Windows
+
+- The agent session itself runs inside stock Paseo, so never quit it. Run a
+  test copy isolated: `PASEO_HOME` (a `config.json` with `daemon.listen` on a
+  free port) plus `PASEO_ELECTRON_USER_DATA_DIR`, from a folder other than
+  `C:\Program Files\Paseo` — the swap closes every process run from the
+  running exe's path, which would include the real Paseo if both ran from it.
+  The server's default settings file follows `PASEO_ELECTRON_USER_DATA_DIR`.
+- `paseo.cmd plugin install <dir> --home <PASEO_HOME>` registers the plugin;
+  "Enable plugins" is a switch in Settings > Plugins.
+- Launch with `--remote-debugging-port=<port>` to drive the renderer over CDP
+  (`/json/list`, `Runtime.evaluate`); the settings screen is
+  `paseo://app/settings/hosts/<id>/plugins/paseo-vibrancy/vibrancy`.
+- `npm test` quotes the glob with double quotes: cmd.exe passes single
+  quotes through literally, and the run found 0 tests.
+- An open `fs.watch` keeps the Windows test process alive after the tests
+  finish: `test/main-hook.test.ts` closes the watchers `PV_JS` opens.

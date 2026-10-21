@@ -7,7 +7,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { HOST_PLATFORM } from "../shared/platform.ts";
+import type { HostPlatform } from "../shared/platform.ts";
 import type { TermMetrics } from "./ghostty.ts";
+import { resourcesDir } from "./layout.ts";
 import { Patcher } from "./patch-engine.ts";
 import {
   ALPHA_HELPER,
@@ -43,8 +46,8 @@ import {
  * changes every release, and a stale sibling left behind by an update would
  * otherwise be a silent no-op patch.
  */
-export function rendererPath(app: string): string {
-  const web = join(app, "Contents", "Resources", "app-dist");
+export function rendererPath(app: string, platform: HostPlatform = HOST_PLATFORM): string {
+  const web = join(resourcesDir(app, platform), "app-dist");
   const html = readFileSync(join(web, "index.html"), "utf8");
   const names = [...new Set(Array.from(html.matchAll(/index-[0-9a-f]+\.js/g), (m) => m[0]))].sort();
   if (names.length !== 1) {

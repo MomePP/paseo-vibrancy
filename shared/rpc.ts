@@ -7,8 +7,10 @@ import { VibrancySettingsSchema } from "./vibrancy.ts";
 export const ReleaseSchema = z.object({
   version: z.string(),
   zipUrl: z.string(),
-  sha512: z.string(),
   size: z.number(),
+  /** sha512 from electron-builder's mac yml, or GitHub's sha256 asset digest on Windows; hex either way. */
+  algorithm: z.enum(["sha512", "sha256"]),
+  digest: z.string(),
 });
 
 export type Release = z.infer<typeof ReleaseSchema>;
@@ -20,6 +22,8 @@ export const BuildProgressSchema = z.object({
 });
 
 export const VibrancyStatusSchema = z.object({
+  /** The host's OS: decides which materials and controls the client offers. */
+  platform: z.enum(["darwin", "win32"]),
   runningVersion: z.string().nullable(),
   runningVibrancyBuild: z.boolean(),
   builtFrom: z.string().nullable(),

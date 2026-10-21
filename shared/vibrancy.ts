@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-export const MATERIALS = [
+import { HOST_PLATFORM } from "./platform.ts";
+import type { HostPlatform } from "./platform.ts";
+
+/** `BrowserWindow.setVibrancy` values; "none" means the blur radius below applies instead. */
+export const MAC_MATERIALS = [
   "none",
   "sidebar",
   "hud",
@@ -17,6 +21,23 @@ export const MATERIALS = [
   "selection",
   "tooltip",
 ] as const;
+
+/** `BrowserWindow.setBackgroundMaterial` values (Windows 11 22H2+); "none" leaves the window see-through with no blur. */
+export const WINDOWS_MATERIALS = ["none", "acrylic", "mica", "tabbed"] as const;
+
+export type Material = (typeof MAC_MATERIALS)[number] | (typeof WINDOWS_MATERIALS)[number];
+
+/** Either OS's material: the client can run on another OS than the host whose settings it edits. */
+const AnyMaterialSchema = z.union([z.enum(MAC_MATERIALS), z.enum(WINDOWS_MATERIALS)]);
+
+export function materialsFor(platform: HostPlatform): readonly Material[] {
+  return platform === "win32" ? WINDOWS_MATERIALS : MAC_MATERIALS;
+}
+
+/** Windows has no blur radius, so its default is the blurring material; on macOS "none" plus the radius blurs. */
+function defaultMaterial(platform: HostPlatform): Material {
+  return platform === "win32" ? "acrylic" : "none";
+}
 
 export const CURSOR_STYLES = ["bar", "block", "underline"] as const;
 export const ANSI_PALETTES = ["oxocarbon", "paseo"] as const;
@@ -36,7 +57,7 @@ export const TERMINAL_DEFAULTS = {
 } as const;
 
 export const VIBRANCY_DEFAULTS = {
-  material: "none",
+  material: defaultMaterial(HOST_PLATFORM),
   blurRadius: 30,
   tint: 0.85,
   paneGlass: true,
@@ -82,31 +103,42 @@ export const TerminalSettingsSchema = z.object({
 
 export type TerminalSettings = z.infer<typeof TerminalSettingsSchema>;
 
-export const VibrancySettingsSchema = z.object({
-  material: z.enum(MATERIALS).catch(VIBRANCY_DEFAULTS.material),
-  blurRadius: z
-    .number()
-    .catch(VIBRANCY_DEFAULTS.blurRadius)
-    .transform((value) => Math.min(60, Math.max(0, value))),
-  tint: z
-    .number()
-    .catch(VIBRANCY_DEFAULTS.tint)
-    .transform((value) => Math.min(1, Math.max(0, value))),
-  paneGlass: z.boolean().catch(VIBRANCY_DEFAULTS.paneGlass),
-  openFilesInNewTab: z.boolean().catch(VIBRANCY_DEFAULTS.openFilesInNewTab),
-  // Missing or non-object `terminal` fails the object parse and lands on the
-  // defaults; each field inside falls back on its own.
-  terminal: TerminalSettingsSchema.catch({ ...TERMINAL_DEFAULTS }),
-});
+/** The settings schema for `platform`: a material from the other OS's list parses to this one's default. */
+function vibrancySettingsSchema(platform: HostPlatform) {
+  const materials = materialsFor(platform);
+  return z.object({
+    material: AnyMaterialSchema.refine((material) => materials.includes(material)).catch(defaultMaterial(platform)),
+    blurRadius: z
+      .number()
+      .catch(VIBRANCY_DEFAULTS.blurRadius)
+      .transform((value) => Math.min(60, Math.max(0, value))),
+    tint: z
+      .number()
+      .catch(VIBRANCY_DEFAULTS.tint)
+      .transform((value) => Math.min(1, Math.max(0, value))),
+    paneGlass: z.boolean().catch(VIBRANCY_DEFAULTS.paneGlass),
+    openFilesInNewTab: z.boolean().catch(VIBRANCY_DEFAULTS.openFilesInNewTab),
+    // Missing or non-object `terminal` fails the object parse and lands on the
+    // defaults; each field inside falls back on its own.
+    terminal: TerminalSettingsSchema.catch({ ...TERMINAL_DEFAULTS }),
+  });
+}
+
+/**
+ * The settings as they cross the RPC boundary, where both ends parse them:
+ * either OS's material passes, since the client may run on a different OS
+ * than the host. The server narrows to its own list with `parseVibrancy`.
+ */
+export const VibrancySettingsSchema = vibrancySettingsSchema(HOST_PLATFORM).extend({ material: AnyMaterialSchema });
 
 export type VibrancySettings = z.infer<typeof VibrancySettingsSchema>;
 
-export function parseVibrancy(raw: unknown): VibrancySettings {
+export function parseVibrancy(raw: unknown, platform: HostPlatform = HOST_PLATFORM): VibrancySettings {
   const input =
     raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  const result = VibrancySettingsSchema.safeParse(input);
+  const result = vibrancySettingsSchema(platform).safeParse(input);
   if (result.success) {
     return result.data;
   }
-  return { ...VIBRANCY_DEFAULTS, terminal: { ...TERMINAL_DEFAULTS } };
+  return { ...VIBRANCY_DEFAULTS, material: defaultMaterial(platform), terminal: { ...TERMINAL_DEFAULTS } };
 }

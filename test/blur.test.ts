@@ -11,7 +11,9 @@ interface BlurExports {
   matchCorners: (handle: Buffer) => boolean;
 }
 
-test("compileBlur compiles blur.node and its exports reject a null-pointer buffer without crashing", async () => {
+const macOnly = { skip: process.platform !== "darwin" ? "the blur addon is macOS-only (clang, AppKit)" : false };
+
+test("compileBlur compiles blur.node and its exports reject a null-pointer buffer without crashing", macOnly, async () => {
   const dir = mkdtempSync(join(tmpdir(), "vibrancy-blur-"));
   const dest = join(dir, "blur.node");
   try {
