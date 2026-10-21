@@ -22,8 +22,8 @@ export const BuildProgressSchema = z.object({
 });
 
 export const VibrancyStatusSchema = z.object({
-  /** The host's OS: decides which materials and controls the client offers. */
-  platform: z.enum(["darwin", "win32"]),
+  /** The host's OS: decides which materials and controls the client offers. Servers before Windows support only ran on macOS. */
+  platform: z.enum(["darwin", "win32"]).catch("darwin"),
   runningVersion: z.string().nullable(),
   runningVibrancyBuild: z.boolean(),
   builtFrom: z.string().nullable(),

@@ -261,7 +261,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
           disabled={appearanceDisabled}
         />
         {/* The host's OS, not this device's: Windows' background materials have a fixed blur, no radius to set. */}
-        {status?.platform === "darwin" && (isWeb ? (
+        {(status?.platform ?? "darwin") === "darwin" && (isWeb ? (
           <RangeRow
             label="Blur radius"
             value={settings.blurRadius}

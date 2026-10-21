@@ -16,7 +16,7 @@
 
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { homedir, tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
@@ -253,7 +253,9 @@ export async function downloadVerified(
   platform: HostPlatform = HOST_PLATFORM,
 ): Promise<string> {
   await mkdir(cacheDir, { recursive: true });
-  const staging = join(tmpdir(), `paseo-vibrancy-dl-${process.pid}-${Date.now()}`);
+  // Next to the cache, not in the temp dir: the final rename must stay on one
+  // volume, and Windows allows %TEMP% on another drive than %LOCALAPPDATA%.
+  const staging = join(cacheDir, `.download-${process.pid}-${Date.now()}`);
   await mkdir(staging, { recursive: true });
 
   try {
