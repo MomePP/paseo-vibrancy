@@ -129,7 +129,73 @@ try {
     }
   }
 
+  // Electron can't maximize a transparent window natively on Windows, so it
+  // fakes it by sizing the window to the display's work area. With an
+  // auto-hide taskbar the work area is the whole monitor, so the window
+  // covers it exactly; Windows then treats it as full screen and never
+  // slides the taskbar up. Maximize to the work area less 2 px at the
+  // bottom instead (the Windows 11 taskbar's only edge; Chromium leaves the
+  // same gap for framed windows). Paseo maximizes, restores and saves the
+  // window state through these methods on the window object, so they are
+  // replaced there and keep their own maximized state.
+  var AUTO_HIDE_GAP = 2;
+
+  function maximizedBounds(win) {
+    var display = electron.screen.getDisplayMatching(win.getBounds());
+    var area = display.workArea;
+    var whole = display.bounds;
+    var autoHide =
+      area.x === whole.x && area.y === whole.y && area.width === whole.width && area.height === whole.height;
+    return { x: area.x, y: area.y, width: area.width, height: area.height - (autoHide ? AUTO_HIDE_GAP : 0) };
+  }
+
+  function emulateMaximize(win) {
+    var maximized = false;
+    var restoreBounds = null;
+    var target = null;
+    win.isMaximized = function () {
+      return maximized;
+    };
+    win.getNormalBounds = function () {
+      return maximized && restoreBounds ? restoreBounds : win.getBounds();
+    };
+    win.maximize = function () {
+      if (maximized) {
+        return;
+      }
+      restoreBounds = win.getBounds();
+      target = maximizedBounds(win);
+      maximized = true;
+      win.setBounds(target);
+      // DIP rounding at fractional scaling can land a pixel off the request.
+      target = win.getBounds();
+      win.emit("maximize");
+    };
+    win.unmaximize = function () {
+      if (!maximized) {
+        return;
+      }
+      maximized = false;
+      win.setBounds(restoreBounds);
+      win.emit("unmaximize");
+    };
+    // Dragging or resizing a maximized window by hand leaves it unmaximized.
+    // "moved"/"resized" fire only at the end of a user's drag, not on setBounds.
+    function userChangedBounds() {
+      var now = win.getBounds();
+      if (maximized && (now.x !== target.x || now.y !== target.y || now.width !== target.width || now.height !== target.height)) {
+        maximized = false;
+        win.emit("unmaximize");
+      }
+    }
+    win.on("moved", userChangedBounds);
+    win.on("resized", userChangedBounds);
+  }
+
   app.on("browser-window-created", function (_event, win) {
+    if (IS_WINDOWS && win && typeof win.setBounds === "function") {
+      emulateMaximize(win);
+    }
     apply(win);
     // Paseo creates its main window with show: false and shows it on
     // ready-to-show; an NSWindow that has never been ordered on screen
