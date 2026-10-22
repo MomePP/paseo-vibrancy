@@ -224,9 +224,11 @@ function psq(s: string): string {
  * quit) with the old copy's `paseo.cmd`, wait up to 40 s more, and give up —
  * reopening the previous app when `open` — if anything is still running.
  * Then the old copy is renamed aside, staging is moved into place (the old
- * copy is restored if that fails), the Start menu shortcut is rewritten, the
- * new copy is launched if `open`, and only then does the old copy go to the
- * Recycle Bin, so a stuck recycle can't hold up the relaunch.
+ * copy is restored if that fails) and the new copy is launched if `open`.
+ * Only after that come the two shell calls: writing the Start menu shortcut
+ * (when it is missing) and sending the old copy to the Recycle Bin. Both go
+ * through Explorer, and `IWshShortcut.Save()` was seen to write the file and
+ * then never return, so each runs in a background job cut off after 15 s.
  */
 export function windowsSwapScript(opts: Omit<SwapOpts, "trashDir">): string {
   const logPath = opts.logPath ?? DEFAULT_SWAP_LOG;
@@ -245,6 +247,12 @@ export function windowsSwapScript(opts: Omit<SwapOpts, "trashDir">): string {
     opts.open
       ? `function Reopen { Log 'reopening previous app'; Start-Process -FilePath ${psq(join(previousApp, WINDOWS_EXE))} }`
       : `function Reopen { }`,
+    `function Bounded($what, $block, $arguments) {`,
+    `  $job = Start-Job -ScriptBlock $block -ArgumentList $arguments`,
+    `  if (-not (Wait-Job $job -Timeout 15)) { Log "$what timed out" }`,
+    `  elseif ($job.State -eq 'Failed') { Log "$what failed: $($job.ChildJobs[0].JobStateInfo.Reason)" }`,
+    `  Remove-Job $job -Force`,
+    `}`,
     `Log 'starting'`,
   ];
 
@@ -285,21 +293,20 @@ export function windowsSwapScript(opts: Omit<SwapOpts, "trashDir">): string {
     `  }`,
     `  Reopen; exit 1`,
     `}`,
-    `try {`,
-    `  $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut(${shortcut})`,
-    `  $shortcut.TargetPath = ${psq(targetExe)}`,
-    `  $shortcut.WorkingDirectory = ${psq(opts.target)}`,
-    `  $shortcut.Save()`,
-    `} catch { Log "shortcut failed: $_" }`,
   );
   if (opts.open) {
     lines.push(`Log 'opening updated app'`, `Start-Process -FilePath ${psq(targetExe)}`);
   }
   lines.push(
+    `$lnk = ${shortcut}`,
+    `if (-not (Test-Path -LiteralPath $lnk)) {`,
+    `  Log 'writing the Start menu shortcut'`,
+    `  Bounded 'shortcut' { param($l, $e, $d) $s = (New-Object -ComObject WScript.Shell).CreateShortcut($l); $s.TargetPath = $e; $s.WorkingDirectory = $d; $s.Save() } @($lnk, ${psq(targetExe)}, ${psq(opts.target)})`,
+    `}`,
     `if (Test-Path -LiteralPath $aside) {`,
     `  Log 'moving previous app to the Recycle Bin'`,
-    `  try { Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($aside, 'OnlyErrorDialogs', 'SendToRecycleBin') }`,
-    `  catch { Log "recycling failed, previous app left at $($aside): $_" }`,
+    `  Bounded 'recycling the previous app' { param($a) Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($a, 'OnlyErrorDialogs', 'SendToRecycleBin') } @($aside)`,
+    `  if (Test-Path -LiteralPath $aside) { Log "previous app left at $($aside)" }`,
     `}`,
     `Log 'complete'`,
   );

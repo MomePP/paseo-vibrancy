@@ -482,7 +482,8 @@ end in an isolated instance.
 | Asar integrity | Windows Electron has no plist hash to update. The build reads the fuse wire (sentinel `dL7pKGdnNz796PbbjQWNKmHXBZaB9tsX`, version byte 1, count, one ASCII byte per fuse) out of `Paseo.exe` and refuses unless `EnableEmbeddedAsarIntegrityValidation` (index 4) is `0`. 0.12.0: `101100011`. |
 | Copy | `copyTree` through `original-fs`, so `app.asar` is copied as a file under the daemon's asar-patched fs (`test/electron-fs.test.ts` runs this under the real `Paseo.exe`). No compile or sign step; `buildPlan` drops `verify`, `compile`, `sign` on Windows. |
 | Material | `setBackgroundMaterial` (`none`, `acrylic`, `mica`, `tabbed`), default `acrylic`; needs Windows 11 22H2 (build 22621). `assertWindowsBlurSupported` refuses older builds before any download. The registry `ProductName` says "Windows 10" on Windows 11: use the build number. The client hides the blur radius row. A material from the other OS's list parses to this OS's default. |
-| Window | `frame: false`, transparent: square corners (electron#47510). No `WS_THICKFRAME`, but Electron answers `WM_NCHITTEST` with the resize codes at the edges. Maximize works; `ShowWindow(SW_MAXIMIZE)` overhangs the screen by 7 DIP. |
+| Window | `frame: false`, transparent: square corners (electron#47510): Electron leaves out `WS_THICKFRAME` for transparent windows, and DWM only rounds framed ones. Electron answers `WM_NCHITTEST` with the resize codes at the edges. |
+| Maximize | Electron can't maximize a transparent window natively, so it sizes it to the work area (`IsZoomed` stays false). With an auto-hide taskbar the work area is the whole monitor, the window covers it exactly, and Windows treats it as full screen: the taskbar never slides up. `pv.js` replaces `maximize`/`unmaximize`/`isMaximized`/`getNormalBounds` on each window (Paseo's toggle, its title-bar button label and its window-state persistence all go through those) and leaves the bottom 2 px free when the work area equals the monitor. Verified: maximized rect `0,0,2560,1438`, the taskbar slides up, restore and relaunch-maximized work. |
 | Quit | `CloseMainWindow()` on the main `Paseo.exe` quits the whole tree, daemon and plugin server included, within about a second (with `keepRunningAfterQuit` false). |
 
 ### Gotchas: starting the swap script on Windows
@@ -501,9 +502,13 @@ end in an isolated instance.
   temp dir, so it never pins a folder it has to move.
 - Paths are passed as PowerShell single-quoted strings (`'` doubled); the
   scripts are tested with apostrophes, spaces and `$(...)` in paths.
-- The old copy is renamed aside, then sent to the Recycle Bin
-  (`Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory`); the Start menu
-  shortcut `Paseo Vibrancy.lnk` is rewritten on every swap.
+- The old copy is renamed aside, staging moved in and the new copy launched
+  first; only then come the shell calls, the Start menu shortcut
+  `Paseo Vibrancy.lnk` (written only when missing) and the Recycle Bin
+  (`Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory`). Each runs in a
+  `Start-Job` cut off after 15 s: `IWshShortcut.Save()` sometimes wrote the
+  file and never returned (about 1 run in 40, more with several at once),
+  which used to stop the swap before it relaunched Paseo.
 
 ### Testing on Windows
 
