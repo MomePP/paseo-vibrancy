@@ -11,7 +11,8 @@
  *
  * macOS: `setVibrancy` plus the `blur.node` radius. Windows: the material
  * goes to `setBackgroundMaterial` (fixed blur, no addon); the lists and
- * defaults mirror `shared/vibrancy.ts`.
+ * defaults mirror `shared/vibrancy.ts`. Both: a WebHID device chooser for
+ * Paseo's browser tabs, which stock Electron leaves to the app.
  */
 
 export const PV_JS = `"use strict";
@@ -206,6 +207,63 @@ try {
         apply(win);
       });
     }
+  });
+
+  // Electron leaves the WebHID chooser to the app: without a
+  // select-hid-device handler, navigator.hid.requestDevice() resolves to []
+  // and no picker appears. Paseo's browser tabs are <webview> guests, so
+  // each guest session gets a native chooser listing the devices the page's
+  // filters matched. Only the device the user picks is granted.
+  var hidSessions = new WeakSet();
+
+  function frameOrigin(frame) {
+    try {
+      return frame && frame.origin ? frame.origin : "This page";
+    } catch (originErr) {
+      return "This page";
+    }
+  }
+
+  function chooseHidDevice(event, details, callback) {
+    event.preventDefault();
+    var devices = details.deviceList || [];
+    var options = {
+      type: "question",
+      message: frameOrigin(details.frame) + " wants to connect to a HID device",
+      detail: devices.length ? "Choose a device." : "No compatible device is connected.",
+      buttons: devices
+        .map(function (device) {
+          var ids = device.vendorId.toString(16).padStart(4, "0") + ":" + device.productId.toString(16).padStart(4, "0");
+          return (device.name || "Unknown device") + " (" + ids + ")";
+        })
+        .concat(["Cancel"]),
+      defaultId: 0,
+      cancelId: devices.length,
+      noLink: true,
+    };
+    var parent = BrowserWindow.getFocusedWindow();
+    var shown = parent ? electron.dialog.showMessageBox(parent, options) : electron.dialog.showMessageBox(options);
+    shown.then(
+      function (result) {
+        var device = devices[result.response];
+        if (device) {
+          callback(device.deviceId);
+        } else {
+          callback();
+        }
+      },
+      function () {
+        callback();
+      },
+    );
+  }
+
+  app.on("web-contents-created", function (_event, contents) {
+    if (contents.getType() !== "webview" || hidSessions.has(contents.session)) {
+      return;
+    }
+    hidSessions.add(contents.session);
+    contents.session.on("select-hid-device", chooseHidDevice);
   });
 
   var watchTimer = null;

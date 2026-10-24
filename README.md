@@ -26,6 +26,7 @@ Paseo's window is opaque, and Electron gives plugins no way to change that. Pase
 - **Workspace labels on their own line**: label chips sit under the branch in the sidebar instead of squeezing it.
 - **Readable workspace title**: the workspace header title uses Medium weight instead of stock Paseo's thin Light weight.
 - **Calmer while agents run**: spinners and shimmers are stepped instead of animating every frame, which cuts WindowServer load.
+- **WebHID in browser tabs**: when a page in a Paseo browser tab calls `navigator.hid.requestDevice()`, a native dialog lists the matching devices and only the one you pick is granted. Stock Paseo shows no chooser, so the request finds nothing. Applies after the next rebuild.
 
 ## Requirements
 
