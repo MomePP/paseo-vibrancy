@@ -39,7 +39,7 @@ var MATERIALS = IS_WINDOWS
       "tooltip",
     ];
 
-var DEFAULTS = { material: IS_WINDOWS ? "acrylic" : "none", blurRadius: 30, tint: 0.85, paneGlass: true };
+var DEFAULTS = { material: IS_WINDOWS ? "acrylic" : "none", blurRadius: 30, tint: 0.85, paneGlass: true, webHidChooser: true };
 
 function clampNumber(value, fallback, min, max) {
   if (typeof value !== "number" || !isFinite(value)) {
@@ -55,6 +55,7 @@ function parseVibrancy(raw) {
     blurRadius: clampNumber(input.blurRadius, DEFAULTS.blurRadius, 0, 60),
     tint: clampNumber(input.tint, DEFAULTS.tint, 0, 1),
     paneGlass: typeof input.paneGlass === "boolean" ? input.paneGlass : DEFAULTS.paneGlass,
+    webHidChooser: typeof input.webHidChooser === "boolean" ? input.webHidChooser : DEFAULTS.webHidChooser,
   };
 }
 
@@ -213,7 +214,9 @@ try {
   // select-hid-device handler, navigator.hid.requestDevice() resolves to []
   // and no picker appears. Paseo's browser tabs are <webview> guests, so
   // each guest session gets a native chooser listing the devices the page's
-  // filters matched. Only the device the user picks is granted.
+  // filters matched. Only the device the user picks is granted. With
+  // webHidChooser off the event is left unhandled, which Electron cancels:
+  // stock behaviour. The setting is read per request, so the toggle is live.
   var hidSessions = new WeakSet();
 
   function frameOrigin(frame) {
@@ -225,6 +228,9 @@ try {
   }
 
   function chooseHidDevice(event, details, callback) {
+    if (!current.webHidChooser) {
+      return;
+    }
     event.preventDefault();
     var devices = details.deviceList || [];
     var options = {

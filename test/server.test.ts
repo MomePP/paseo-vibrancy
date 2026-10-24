@@ -43,6 +43,7 @@ test("writeSettings then readSettings round-trips", () => {
       tint: 0.4,
       paneGlass: false,
       openFilesInNewTab: false,
+      webHidChooser: false,
       terminal: { ...TERMINAL_DEFAULTS, cursorStyle: "block" as const, paddingLeft: 3 },
     };
     writeSettings(settings, file);
@@ -443,6 +444,7 @@ test("getSettings/setSettings round-trip through the handlers", async () => {
       tint: 0.6,
       paneGlass: false,
       openFilesInNewTab: false,
+      webHidChooser: false,
       terminal: { ...TERMINAL_DEFAULTS, ansi: "paseo" as const, fontSize: null },
     };
     const written = await handlers.setSettings(settings);

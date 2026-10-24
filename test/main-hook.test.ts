@@ -484,3 +484,28 @@ test("WebHID: tabs sharing a session ask once per request; Paseo's own window ge
   assert.equal(sandbox.dialogs.length, 1);
   assert.equal(paseoWindow.listenerCount("select-hid-device"), 0);
 });
+
+/** Emits `select-hid-device` and reports whether `pv.js` took the request (Electron cancels an unprevented one). */
+function chooserTookRequest(session: EventEmitter): boolean {
+  const event = { defaultPrevented: false, preventDefault: () => (event.defaultPrevented = true) };
+  session.emit("select-hid-device", event, { deviceList: [GOGO_BOARD], frame: null }, () => {});
+  return event.defaultPrevented;
+}
+
+test("WebHID chooser off: the request is left to Electron, which cancels it; turning it on applies live", async (t) => {
+  const { dir, watchers } = settingsDir(t);
+  const settingsFile = join(dir, "paseo-vibrancy.json");
+  writeFileSync(settingsFile, JSON.stringify({ webHidChooser: false }));
+  const sandbox = loadPvJs(dir, watchers);
+  const session = new EventEmitter();
+  sandbox.fireWebContentsCreated({ getType: () => "webview", session });
+
+  assert.equal(chooserTookRequest(session), false);
+  assert.equal(sandbox.dialogs.length, 0);
+
+  let took = false;
+  await writeUntil(settingsFile, JSON.stringify({ webHidChooser: true }), () => (took = chooserTookRequest(session)));
+
+  assert.equal(took, true, "timed out after 2s waiting for the settings watcher to turn the chooser on");
+  assert.equal(sandbox.dialogs.length, 1);
+});

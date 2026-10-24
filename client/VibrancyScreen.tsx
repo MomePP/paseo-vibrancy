@@ -326,6 +326,20 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
     </SettingsSection>
   );
 
+  const browserSection = (
+    <SettingsSection title="Browser">
+      <SettingsCard>
+        <SettingsSwitch
+          label="WebHID device chooser"
+          hint="Pages in browser tabs can ask for a HID device; you pick it in a dialog"
+          value={settings.webHidChooser}
+          onValueChange={(webHidChooser) => updateSettings({ ...settings, webHidChooser })}
+          disabled={appearanceDisabled}
+        />
+      </SettingsCard>
+    </SettingsSection>
+  );
+
   const terminal = settings.terminal;
   const terminalDisabled = !settingsLoaded;
   const overridden = new Set(terminal.followGhostty ? (status?.ghosttyOverrides ?? []) : []);
@@ -533,6 +547,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
     <>
       {appearanceSection}
       {tabsSection}
+      {browserSection}
       {terminalSection}
       {buildSection}
     </>
