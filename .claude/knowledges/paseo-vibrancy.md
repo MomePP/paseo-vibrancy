@@ -57,8 +57,44 @@ test/                       node --test
 | --- | --- | --- |
 | `index.client.tsx`, `client/` | renderer | Vibrancy settings screen, live `--paseo-*` CSS variables, update notice |
 | `index.server.ts`, `server/` | daemon subprocess (full Node) | release fetch/verify, build, swap, settings file |
-| `pv.js` (generated into the bundle) | Paseo's Electron main process | per-window material/blur, watches the settings file |
+| `pv.js` (generated into the bundle) | Paseo's Electron main process | per-window material/blur, watches the settings file, WebHID chooser for browser tabs |
 | `blur.node` (compiled into the bundle) | Paseo's Electron main process | `setBlur(handle, radius)` via private CGS calls, `dlsym`'d so a missing symbol is a no-op, not a crash; `matchCorners(handle)` keeps the window server's corner radius equal to AppKit's |
+
+## WebHID chooser for browser tabs (`pv.js`)
+
+Paseo's browser tabs are `<webview>` guests on the `persist:paseo-browser`
+partition (`dist/features/browser-profile.js`). Electron gives an app no HID
+chooser: with no `select-hid-device` listener on the session,
+`navigator.hid.requestDevice()` resolves to `[]` and nothing is shown.
+Paseo 0.13.0 sets no listener and no permission handlers, so stock Paseo
+cannot use WebHID at all (observed: code.gogoboard.org's Connect returned
+`[]` with a GoGo Board 7, `0461:0020`, plugged in).
+
+`pv.js` listens on `app`'s `web-contents-created`; for a `webview` guest it
+adds one `select-hid-device` listener per session (a `WeakSet` dedupes the
+guests that share the partition). With `webHidChooser` off (read from
+`current`, the watched settings file, per request, so the toggle is live)
+the listener returns without `preventDefault()`; Electron then cancels the
+request, exactly as with no listener. With it on, the listener calls
+`preventDefault()` and
+shows `dialog.showMessageBox` (a sheet on the focused window) with one button
+per device, `<name> (<vid>:<pid>)` in 4-digit hex, plus Cancel. The picked
+device's `deviceId` goes to `callback`; Cancel, a dialog error, or an empty
+list calls `callback()` with no argument, which Electron treats as cancel.
+The dialog lists only what Chromium already filtered: the page's filters,
+minus devices whose reports are all protected (Chromium logs "Chooser dialog
+is not displaying a device whose reports are all protected" for the GoGo
+board's keyboard interface; its raw-HID interface is listed).
+
+Permission checks need no handler: with none set, Electron allows them, and
+Paseo sets none. No `setDevicePermissionHandler` either, so a grant lasts for
+the session (Chromium's default), not across relaunches. Paseo's own window
+(`getType() === "window"`) gets no listener.
+
+Verified on a patched 0.13.0 copy run isolated (`PASEO_HOME` +
+`PASEO_ELECTRON_USER_DATA_DIR`, `--remote-debugging-port`): a webview on
+`persist:paseo-browser` calling `requestDevice({filters:[{vendorId:0x0461}]})`
+with a CDP `userGesture` resolved to `GoGo Board 7 461:20` with one collection.
 
 ## Live appearance settings
 
@@ -72,11 +108,14 @@ Schema lives in `shared/vibrancy.ts`, persisted by the server to
   blurRadius: number,   // 0–60, used when material is "none"
   tint: number,         // 0–1
   paneGlass: boolean,
-  openFilesInNewTab: boolean }  // plus `terminal`, see below
+  openFilesInNewTab: boolean,
+  webHidChooser: boolean }  // plus `terminal`, see below
 ```
 
 Defaults: `{ material: "none", blurRadius: 30, tint: 0.85, paneGlass: true,
-openFilesInNewTab: false }`.
+openFilesInNewTab: false, webHidChooser: true }`. `pv.js` parses
+`webHidChooser` alongside the appearance fields (same default), so the
+chooser follows the file without a restart.
 
 - **Main process (`pv.js`).** Loaded by the asar window-options hook line
   `transparent:require(process.resourcesPath+"/pv.js"),visualEffectState:"active",`
@@ -105,11 +144,13 @@ openFilesInNewTab: false }`.
   live; plugin disabled ⇒ flag undefined ⇒ stock behaviour. The first build
   after updating the plugin is needed to carry the patch.
 - **Vibrancy screen** (`addSettingsScreen({ id: "vibrancy", title: "Vibrancy", … })`):
-  four sections. Appearance: Material (`SettingsSelect`), Blur radius and Tint
+  five sections. Appearance: Material (`SettingsSelect`), Blur radius and Tint
   (styled `<input type="range">`), Main pane glass (`SettingsSwitch`); every
   change calls `setSettings`, tint/pane apply locally at once rather than
   waiting on the round trip. Tabs: Open files in a new tab (`SettingsSwitch`,
-  disabled like the Appearance controls). Terminal: the settings below (range rows fall
+  disabled like the Appearance controls). Browser: WebHID device chooser
+  (`SettingsSwitch`, disabled the same way; only the main process reads it).
+  Terminal: the settings below (range rows fall
   back to selects off web); rows Ghostty overrides are disabled and hinted
   "Set by Ghostty config". Build: versions, report, actions, and "Rebuild to
   apply changes" when `runningVibrancyBuild && !fingerprintMatches`. Saving

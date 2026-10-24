@@ -26,6 +26,7 @@ Paseo's window is opaque, and Electron gives plugins no way to change that. Pase
 - **Workspace labels on their own line**: label chips sit under the branch in the sidebar instead of squeezing it.
 - **Readable workspace title**: the workspace header title uses Medium weight instead of stock Paseo's thin Light weight.
 - **Calmer while agents run**: spinners and shimmers are stepped instead of animating every frame, which cuts WindowServer load.
+- **WebHID in browser tabs**: when a page in a Paseo browser tab calls `navigator.hid.requestDevice()`, a native dialog lists the matching devices and only the one you pick is granted. Stock Paseo shows no chooser, so the request finds nothing. On by default; switch it off under **Browser**.
 
 ## Requirements
 
@@ -77,6 +78,14 @@ Applied live, without a restart. The first build after updating the plugin is ne
 | Control | Range | Default | Effect |
 | --- | --- | --- | --- |
 | Open files in a new tab | on / off | off | Clicking a file in Files, or opening one from Changes, always opens a new tab instead of replacing the focused unmodified file tab. Off keeps stock Paseo behaviour. |
+
+### Browser
+
+Applied live, without a restart. The first build after updating the plugin is needed to carry the chooser this toggle switches.
+
+| Control | Range | Default | Effect |
+| --- | --- | --- | --- |
+| WebHID device chooser | on / off | on | When a page in a browser tab asks for a HID device, a dialog lists the devices it asked for and grants only the one you pick, until Paseo quits. Off keeps stock Paseo behaviour: the request finds no device. |
 
 ### Terminal
 

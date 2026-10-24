@@ -82,3 +82,9 @@ test("parseVibrancy reads openFilesInNewTab, defaulting to false for missing or 
   assert.equal(parseVibrancy({ openFilesInNewTab: "yes" }).openFilesInNewTab, false);
   assert.equal(parseVibrancy({ openFilesInNewTab: 1 }).openFilesInNewTab, false);
 });
+
+test("parseVibrancy reads webHidChooser, defaulting to true for missing or non-boolean values", () => {
+  assert.equal(parseVibrancy({}).webHidChooser, true);
+  assert.equal(parseVibrancy({ webHidChooser: false }).webHidChooser, false);
+  assert.equal(parseVibrancy({ webHidChooser: "no" }).webHidChooser, true);
+});

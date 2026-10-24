@@ -34,6 +34,11 @@ interface Sandbox {
   createdListeners: Listener[];
   module: { exports: unknown };
   fireBrowserWindowCreated: (win: FakeWindow) => void;
+  /** Options of every `dialog.showMessageBox` call, in order. */
+  dialogs: Array<{ message: string; buttons: string[]; cancelId: number }>;
+  /** The button index the next message box resolves with. */
+  dialogResponse: number;
+  fireWebContentsCreated: (contents: { getType: () => string; session: EventEmitter }) => void;
 }
 
 function makeWindow(): FakeWindow {
@@ -89,6 +94,7 @@ function loadPvJs(
   const windows: FakeWindow[] = [];
   const blurCalls: BlurCall[] = [];
   const createdListeners: Listener[] = [];
+  const webContentsListeners: Listener[] = [];
 
   const fakeElectron = {
     app: {
@@ -96,11 +102,20 @@ function loadPvJs(
       on: (event: string, listener: Listener) => {
         if (event === "browser-window-created") {
           createdListeners.push(listener);
+        } else if (event === "web-contents-created") {
+          webContentsListeners.push(listener);
         }
       },
     },
     BrowserWindow: {
       getAllWindows: () => windows,
+      getFocusedWindow: () => windows[0] ?? null,
+    },
+    dialog: {
+      showMessageBox: (...args: unknown[]) => {
+        sandbox.dialogs.push(args.at(-1) as Sandbox["dialogs"][number]);
+        return Promise.resolve({ response: sandbox.dialogResponse });
+      },
     },
     screen: {
       getDisplayMatching: (_rect: Rect) => display,
@@ -130,6 +145,13 @@ function loadPvJs(
       windows.push(win);
       for (const listener of createdListeners) {
         listener({}, win);
+      }
+    },
+    dialogs: [],
+    dialogResponse: 0,
+    fireWebContentsCreated: (contents) => {
+      for (const listener of webContentsListeners) {
+        listener({}, contents);
       }
     },
   };
@@ -406,4 +428,84 @@ test("macOS: maximize is left to Electron", (t) => {
 
   assert.equal(win.maximize, undefined);
   assert.equal(win.isMaximized, undefined);
+});
+
+const GOGO_BOARD = { deviceId: "gogo", name: "GoGo Board 7", vendorId: 0x0461, productId: 0x0020 };
+const KEYPAD = { deviceId: "keypad", name: "", vendorId: 0x046d, productId: 0xc31c };
+
+/** Emits `select-hid-device` as Electron does for a page's `requestDevice`; resolves with what `callback` got. */
+function requestHidDevice(session: EventEmitter, deviceList: unknown[]): Promise<{ defaultPrevented: boolean; args: unknown[] }> {
+  const { promise, resolve } = Promise.withResolvers<{ defaultPrevented: boolean; args: unknown[] }>();
+  const event = { defaultPrevented: false, preventDefault: () => (event.defaultPrevented = true) };
+  const details = { deviceList, frame: { origin: "https://code.gogoboard.org" } };
+  session.emit("select-hid-device", event, details, (...args: unknown[]) => resolve({ defaultPrevented: event.defaultPrevented, args }));
+  return promise;
+}
+
+test("WebHID in a browser tab: the device the user picks is granted", async (t) => {
+  const { dir, watchers } = settingsDir(t);
+  const sandbox = loadPvJs(dir, watchers);
+  const session = new EventEmitter();
+  sandbox.fireWebContentsCreated({ getType: () => "webview", session });
+  sandbox.dialogResponse = 1;
+
+  const result = await requestHidDevice(session, [KEYPAD, GOGO_BOARD]);
+
+  assert.equal(result.defaultPrevented, true);
+  assert.deepEqual(result.args, ["gogo"]);
+  assert.deepEqual(sandbox.dialogs[0].buttons, ["Unknown device (046d:c31c)", "GoGo Board 7 (0461:0020)", "Cancel"]);
+  assert.match(sandbox.dialogs[0].message, /^https:\/\/code\.gogoboard\.org /);
+});
+
+test("WebHID in a browser tab: Cancel grants nothing", async (t) => {
+  const { dir, watchers } = settingsDir(t);
+  const sandbox = loadPvJs(dir, watchers);
+  const session = new EventEmitter();
+  sandbox.fireWebContentsCreated({ getType: () => "webview", session });
+  sandbox.dialogResponse = 1;
+
+  const result = await requestHidDevice(session, [GOGO_BOARD]);
+
+  assert.equal(sandbox.dialogs[0].cancelId, 1);
+  assert.deepEqual(result.args, []);
+});
+
+test("WebHID: tabs sharing a session ask once per request; Paseo's own window gets no chooser", async (t) => {
+  const { dir, watchers } = settingsDir(t);
+  const sandbox = loadPvJs(dir, watchers);
+  const tabs = new EventEmitter();
+  const paseoWindow = new EventEmitter();
+  sandbox.fireWebContentsCreated({ getType: () => "webview", session: tabs });
+  sandbox.fireWebContentsCreated({ getType: () => "webview", session: tabs });
+  sandbox.fireWebContentsCreated({ getType: () => "window", session: paseoWindow });
+
+  await requestHidDevice(tabs, [GOGO_BOARD]);
+
+  assert.equal(sandbox.dialogs.length, 1);
+  assert.equal(paseoWindow.listenerCount("select-hid-device"), 0);
+});
+
+/** Emits `select-hid-device` and reports whether `pv.js` took the request (Electron cancels an unprevented one). */
+function chooserTookRequest(session: EventEmitter): boolean {
+  const event = { defaultPrevented: false, preventDefault: () => (event.defaultPrevented = true) };
+  session.emit("select-hid-device", event, { deviceList: [GOGO_BOARD], frame: null }, () => {});
+  return event.defaultPrevented;
+}
+
+test("WebHID chooser off: the request is left to Electron, which cancels it; turning it on applies live", async (t) => {
+  const { dir, watchers } = settingsDir(t);
+  const settingsFile = join(dir, "paseo-vibrancy.json");
+  writeFileSync(settingsFile, JSON.stringify({ webHidChooser: false }));
+  const sandbox = loadPvJs(dir, watchers);
+  const session = new EventEmitter();
+  sandbox.fireWebContentsCreated({ getType: () => "webview", session });
+
+  assert.equal(chooserTookRequest(session), false);
+  assert.equal(sandbox.dialogs.length, 0);
+
+  let took = false;
+  await writeUntil(settingsFile, JSON.stringify({ webHidChooser: true }), () => (took = chooserTookRequest(session)));
+
+  assert.equal(took, true, "timed out after 2s waiting for the settings watcher to turn the chooser on");
+  assert.equal(sandbox.dialogs.length, 1);
 });

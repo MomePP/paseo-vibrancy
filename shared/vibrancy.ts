@@ -62,6 +62,7 @@ export const VIBRANCY_DEFAULTS = {
   tint: 0.85,
   paneGlass: true,
   openFilesInNewTab: false,
+  webHidChooser: true,
   terminal: TERMINAL_DEFAULTS,
 } as const;
 
@@ -118,6 +119,7 @@ function vibrancySettingsSchema(platform: HostPlatform) {
       .transform((value) => Math.min(1, Math.max(0, value))),
     paneGlass: z.boolean().catch(VIBRANCY_DEFAULTS.paneGlass),
     openFilesInNewTab: z.boolean().catch(VIBRANCY_DEFAULTS.openFilesInNewTab),
+    webHidChooser: z.boolean().catch(VIBRANCY_DEFAULTS.webHidChooser),
     // Missing or non-object `terminal` fails the object parse and lands on the
     // defaults; each field inside falls back on its own.
     terminal: TerminalSettingsSchema.catch({ ...TERMINAL_DEFAULTS }),
