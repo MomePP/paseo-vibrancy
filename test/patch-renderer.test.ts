@@ -246,7 +246,13 @@ test("every BUILD_TABLES patch entry's replacement is a plain string, never a fu
   // function-valued replacement's actual output would be invisible to it, so
   // a rewrite of the function body would leave the fingerprint unchanged.
   function checkEntry(entry: unknown): void {
-    if (!entry || typeof entry !== "object" || !("replacement" in entry)) {
+    if (!entry || typeof entry !== "object") {
+      return;
+    }
+    if ("variants" in entry && Array.isArray(entry.variants)) {
+      entry.variants.forEach(checkEntry);
+    }
+    if (!("replacement" in entry)) {
       return;
     }
     const label = "label" in entry ? entry.label : undefined;
