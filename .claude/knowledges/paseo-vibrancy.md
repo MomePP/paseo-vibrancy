@@ -450,6 +450,24 @@ update completing).
   target's executable ended immediately while stock Paseo was still
   quitting and holding the shared userData lock — see "Swap and restart"
   above for the `runningExe` fix.
+- **Paseo 0.13 changed the bundle's object syntax.** Its Expo 57 toolchain
+  emits object spread natively: a style 0.12 compiled to
+  `toast:Object.assign({…},e.shadow.md,{…})` is `toast:{…,...e.shadow.md,…}`
+  in 0.13. Anchors take `(?:Object\.assign\()?\{` so one table serves both.
+- **An anchor that differs between Paseo versions is a `variants` entry.**
+  0.13 replaced `tabHovered`/`tabActive`/`tabActiveUnfocused` with one
+  `tabFill(backdrop)`, so `TAB_FILLS` lists both shapes and
+  `Patcher.replaceReFirst` applies the first one present. A plain table entry
+  per shape would leave the other shape MISSED, and the build stamp `missed`,
+  on every version. Every patch applies on both 0.12.0-beta.1 and 0.13.0.
+- **The client's SDK imports must exist on the oldest supported host.** The
+  plugin client runs against the host Paseo's own SDK modules. SDK 0.13
+  deprecates `@getpaseo/plugin/client/react-native` for `client/ui`, but
+  `client/ui` only exports `ScrollView` and `useToast` from 0.13 on, so moving
+  the imports would break the Vibrancy screen (the one that updates Paseo) on
+  0.11 and 0.12. The deprecated entry stays until `requirements.paseo` is
+  raised to `>=0.13.0`; the SDK removes it after 2027-04-20. The devDependency
+  stays pinned to the minimum host (0.11.0) for the same reason.
 
 ## Verifying a build outside the GUI
 

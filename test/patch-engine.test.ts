@@ -39,6 +39,22 @@ test("sweepRe with no matches adds a 'no matching styles' MISSED note", () => {
   assert.equal(patcher.src, "nothing to see");
 });
 
+test("replaceReFirst applies the first variant whose shape is present, else reports MISSED", () => {
+  const variants = [
+    { pattern: /old-(\w)/g, replacement: "was-$1" },
+    { pattern: /new-(\w)/g, replacement: "now-$1" },
+  ];
+  const patcher = new Patcher("new-a");
+  patcher.replaceReFirst("shape", variants, 1);
+  assert.equal(patcher.src, "now-a");
+  assert.deepEqual(patcher.notes, ["ok      shape (1x)"]);
+
+  const absent = new Patcher("neither");
+  absent.replaceReFirst("shape", variants, 1);
+  assert.equal(absent.src, "neither");
+  assert.deepEqual(absent.notes, ["MISSED  shape: target not found"]);
+});
+
 test("ASAR_HOOK_LINE is 79 bytes", () => {
   assert.equal(ASAR_HOOK_LINE.length, 79);
 });

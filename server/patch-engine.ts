@@ -69,6 +69,16 @@ export class Patcher {
     this.notes.push(`ok      ${label} (${hits}x)`);
   }
 
+  /** One patch whose anchor differs between Paseo versions: the first shape present wins. */
+  replaceReFirst(label: string, variants: readonly { pattern: RegExp; replacement: string }[], expect: number): void {
+    const variant = variants.find(({ pattern }) => this.src.search(pattern) !== -1);
+    if (!variant) {
+      this.notes.push(`MISSED  ${label}: target not found`);
+      return;
+    }
+    this.replaceRe(label, variant.pattern, variant.replacement, expect);
+  }
+
   sweepRe(label: string, re: RegExp, neu: Replacer): void {
     const global = re.global ? re : new RegExp(re.source, `${re.flags}g`);
     const hits = [...this.src.matchAll(global)].length;

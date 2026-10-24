@@ -184,14 +184,29 @@ const OVERLAY_FILL = "var(--paseo-overlay-fill)";
 // the same way: without it they came out 18px too narrow and truncated their
 // own label. The fill patches run after HOVER_HIGHLIGHT, which has already
 // turned `tabHovered` and `workspaceRowHovered` into `interactionHighlight`.
+//
+// Paseo 0.13 replaced the three tab state styles with one `tabFill(backdrop)`
+// keyed by the chip's surface token: `surface2` focused, `surface1` hovered or
+// active in an unfocused pane, and the `surfaceSidebar*` tokens on the
+// Explorer's rail. Hover maps to the overlay fill on both rails, the focused
+// tab to the selection, matching the sidebar rows.
+export const TAB_FILLS = {
+  label: "glass tab fills",
+  expect: 1,
+  variants: [
+    {
+      pattern:
+        /(tabHovered:\{backgroundColor:)([A-Za-z_$][\w$]*)\.colors\.interactionHighlight(,uni__dependencies:\[0\]\},tabActive:\{backgroundColor:\2\.colors\.)surface2(,uni__dependencies:\[0\]\},tabActiveUnfocused:\{backgroundColor:)\2\.colors\.surface1\b/g,
+      replacement: `$1"${OVERLAY_FILL}"$3surfaceSidebarSelected$4"${OVERLAY_FILL}"`,
+    },
+    {
+      pattern: /(tabFill:([A-Za-z_$][\w$]*)=>\(\{backgroundColor:)([A-Za-z_$][\w$]*)\.colors\[\2\]/g,
+      replacement: `$1"surface1"===$2||"surfaceSidebarHover"===$2?"${OVERLAY_FILL}":$3.colors["surface2"===$2?"surfaceSidebarSelected":$2]`,
+    },
+  ],
+} as const;
+
 export const TAB_GLASS: ExpectedReTableEntry[] = [
-  {
-    label: "glass tab fills",
-    pattern:
-      /(tabHovered:\{backgroundColor:)([A-Za-z_$][\w$]*)\.colors\.interactionHighlight(,uni__dependencies:\[0\]\},tabActive:\{backgroundColor:\2\.colors\.)surface2(,uni__dependencies:\[0\]\},tabActiveUnfocused:\{backgroundColor:)\2\.colors\.surface1\b/g,
-    replacement: `$1"${OVERLAY_FILL}"$3surfaceSidebarSelected$4"${OVERLAY_FILL}"`,
-    expect: 1,
-  },
   {
     label: "overlay sidebar row hover",
     pattern: /(workspaceRowHovered:\{backgroundColor:)[A-Za-z_$][\w$]*\.colors\.interactionHighlight\b/g,
@@ -429,7 +444,7 @@ export const GLASS_SURFACES: ExpectedReTableEntry[] = [
   },
   {
     label: "glass toast pill",
-    pattern: /(toast:Object\.assign\(\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface0/g,
+    pattern: /(toast:(?:Object\.assign\()?\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface0/g,
     replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${GLASS_BLUR}"`,
     expect: 1,
   },
@@ -444,7 +459,7 @@ export const GLASS_SURFACES: ExpectedReTableEntry[] = [
     // against the frosted chat behind it.
     label: "glass composer",
     pattern:
-      /(inputWrapper:Object\.assign\(\{flexShrink:1,flexDirection:"column",gap:[A-Za-z_$][\w$]*\.spacing\[3\],backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1(,borderWidth:[A-Za-z_$][\w$]*\.borderWidth\[1\])/g,
+      /(inputWrapper:(?:Object\.assign\()?\{flexShrink:1,flexDirection:"column",gap:[A-Za-z_$][\w$]*\.spacing\[3\],backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1(,borderWidth:[A-Za-z_$][\w$]*\.borderWidth\[1\])/g,
     replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}"$2`,
     expect: 1,
   },
@@ -463,7 +478,7 @@ export const GLASS_SURFACES: ExpectedReTableEntry[] = [
   },
   {
     label: "glass scroll-to-bottom button",
-    pattern: /(scrollToBottomButton:Object\.assign\(\{width:48,height:48,borderRadius:24,backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface2/g,
+    pattern: /(scrollToBottomButton:(?:Object\.assign\()?\{width:48,height:48,borderRadius:24,backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface2/g,
     replacement: `$1"${FROST_FILL}",backdropFilter:"${FROST_BLUR}"`,
     expect: 1,
   },
@@ -475,14 +490,14 @@ export const GLASS_SURFACES: ExpectedReTableEntry[] = [
   },
   {
     label: "glass autocomplete detail card",
-    pattern: /(detailCard:Object\.assign\(\{backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1,borderWidth:[A-Za-z_$][\w$]*\.borderWidth\[1\]/g,
+    pattern: /(detailCard:(?:Object\.assign\()?\{backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1,borderWidth:[A-Za-z_$][\w$]*\.borderWidth\[1\]/g,
     replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${GLASS_BLUR}",borderWidth:0`,
     expect: 1,
   },
   {
     label: "glass autocomplete list",
     pattern:
-      /(container:Object\.assign\(\{flexShrink:1,minHeight:0,backgroundColor:)([A-Za-z_$][\w$]*)\.colors\.surface1,borderWidth:\2\.borderWidth\[1\](,borderColor:\2\.colors\.borderAccent,borderRadius:\2\.borderRadius\.lg,overflow:"hidden")/g,
+      /(container:(?:Object\.assign\()?\{flexShrink:1,minHeight:0,backgroundColor:)([A-Za-z_$][\w$]*)\.colors\.surface1,borderWidth:\2\.borderWidth\[1\](,borderColor:\2\.colors\.borderAccent,borderRadius:\2\.borderRadius\.lg,overflow:"hidden")/g,
     replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${GLASS_BLUR}",borderWidth:0$3`,
     expect: 1,
   },
@@ -660,6 +675,7 @@ export const BUILD_TABLES = {
   KEBAB_GUTTER_PX,
   KEBAB_GUTTER,
   LABELS_LINE,
+  TAB_FILLS,
   TAB_GLASS,
   HANDLE_HIGHLIGHT_TOKEN,
   HANDLE_HIGHLIGHT,
