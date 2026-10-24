@@ -190,6 +190,52 @@ test("patchRenderer records a MISSED note for the file tab reuse guard when its 
   assert.ok(notes.some((n) => n.startsWith("MISSED") && n.includes("file tab reuse guard")));
 });
 
+// Paseo 0.13's toolchain (Expo 57) emits object spread natively where 0.12's
+// emitted `Object.assign({...}, theme.shadow.md)`.
+const SPREAD_SURFACES =
+  'toast:{alignSelf:"center",maxWidth:"100%",gap:e.spacing[2],backgroundColor:e.colors.surface0,borderRadius:e.borderRadius["2xl"],...e.shadow.md},' +
+  'inputWrapper:{flexShrink:1,flexDirection:"column",gap:e.spacing[3],backgroundColor:e.colors.surface1,borderWidth:e.borderWidth[1],borderColor:e.colors.borderAccent},' +
+  'scrollToBottomButton:{width:48,height:48,borderRadius:24,backgroundColor:e.colors.surface2,alignItems:"center",...e.shadow.sm},' +
+  "detailCard:{backgroundColor:t.colors.surface1,borderWidth:t.borderWidth[1],borderColor:t.colors.borderAccent,...t.shadow.md}," +
+  'container:{flexShrink:1,minHeight:0,backgroundColor:t.colors.surface1,borderWidth:t.borderWidth[1],borderColor:t.colors.borderAccent,borderRadius:t.borderRadius.lg,overflow:"hidden",...t.shadow.md}';
+
+test("patchRenderer glasses the floating surfaces Paseo 0.13 writes with object spread", () => {
+  const { notes } = patchRenderer(SPREAD_SURFACES, DEFAULT_TERM);
+  for (const label of [
+    "glass toast pill",
+    "glass composer",
+    "glass scroll-to-bottom button",
+    "glass autocomplete detail card",
+    "glass autocomplete list",
+  ]) {
+    assert.ok(notes.includes(`ok      ${label} (1x)`), label);
+  }
+});
+
+test("patchRenderer maps Paseo 0.13's tab chip backdrops to the glass fills", () => {
+  const colors = {
+    surface1: "s1",
+    surface2: "s2",
+    surfaceSidebar: "sb",
+    surfaceSidebarHover: "sbh",
+    surfaceSidebarSelected: "sbs",
+  };
+  const { src, notes } = patchRenderer(
+    "var S={tabFill:t=>({backgroundColor:e.colors[t],uni__dependencies:[0]})};",
+    DEFAULT_TERM,
+  );
+  assert.ok(notes.includes("ok      glass tab fills (1x)"));
+  const styles = new Function("e", `${src};return S;`)({ colors }) as {
+    tabFill: (backdrop: string) => { backgroundColor: string };
+  };
+  const fill = (backdrop: string) => styles.tabFill(backdrop).backgroundColor;
+  assert.equal(fill("surface1"), "var(--paseo-overlay-fill)");
+  assert.equal(fill("surfaceSidebarHover"), "var(--paseo-overlay-fill)");
+  assert.equal(fill("surface2"), "sbs");
+  assert.equal(fill("surfaceSidebarSelected"), "sbs");
+  assert.equal(fill("surfaceSidebar"), "sb");
+});
+
 test("SCRIM_COLOURS.replacement is baked from PANE, not a dead placeholder", () => {
   assert.notEqual(SCRIM_COLOURS.replacement, "");
   assert.ok(String(SCRIM_COLOURS.replacement).includes(PANE));
