@@ -1,9 +1,10 @@
 /**
- * The Vibrancy settings screen. Appearance edits `VibrancySettings` live (CSS applied
- * immediately, `setSettingsRpc` debounced 150ms so dragging a slider doesn't
- * flood the server). Build reports the running/built-from/latest versions,
- * drives rebuild/update (both restart Paseo), and shows a progress bar
- * while a build runs.
+ * The Vibrancy settings screen. Appearance edits `VibrancySettings` of the
+ * host picked in the header, saved through `setSettingsRpc` debounced 150ms so
+ * dragging a slider doesn't flood the server; that host's `pv.js` sees its
+ * settings file change and applies it to that device's windows. Build reports
+ * the running/built-from/latest versions, drives rebuild/update (both restart
+ * Paseo), and shows a progress bar while a build runs.
  *
  * Also mounted (via `index.client.tsx`'s conditional `addScreen`) as the
  * launch-time "update available" / "rebuild needed" sidebar surface — same
@@ -33,7 +34,6 @@ import type { VibrancySettings } from "../shared/vibrancy.ts";
 import { buildRpc, checkUpdateRpc, getSettingsRpc, setSettingsRpc, statusRpc } from "../shared/rpc.ts";
 import type { VibrancyStatus } from "../shared/rpc.ts";
 import { compareVersions } from "../shared/version.ts";
-import { applyLiveSettings } from "./live-settings.ts";
 import RangeRow from "./RangeRow.tsx";
 
 const SET_SETTINGS_DEBOUNCE_MS = 150;
@@ -106,7 +106,6 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
       .then((loaded) => {
         setSettings(loaded);
         setSettingsLoaded(true);
-        applyLiveSettings(loaded);
       })
       .catch((error: unknown) => {
         toast.error(error instanceof Error ? error.message : "Failed to load Vibrancy settings");
@@ -128,7 +127,6 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
 
   function updateSettings(next: VibrancySettings) {
     setSettings(next);
-    applyLiveSettings(next);
     pendingRef.current = next;
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {

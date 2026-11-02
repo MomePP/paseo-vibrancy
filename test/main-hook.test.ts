@@ -12,6 +12,11 @@ import type { HostPlatform } from "../shared/platform.ts";
 
 type Listener = (...args: unknown[]) => void;
 
+interface FakeWebContents extends EventEmitter {
+  scripts: string[];
+  executeJavaScript: (script: string) => Promise<unknown>;
+}
+
 interface FakeWindow {
   setVibrancy: (material: string | null) => void;
   setBackgroundMaterial: (material: string) => void;
@@ -20,6 +25,7 @@ interface FakeWindow {
   materialCalls: string[];
   on: (event: string, listener: Listener) => void;
   fireShow: () => void;
+  webContents: FakeWebContents;
 }
 
 interface BlurCall {
@@ -41,9 +47,21 @@ interface Sandbox {
   fireWebContentsCreated: (contents: { getType: () => string; session: EventEmitter }) => void;
 }
 
+function makeWebContents(): FakeWebContents {
+  const scripts: string[] = [];
+  return Object.assign(new EventEmitter(), {
+    scripts,
+    executeJavaScript: (script: string) => {
+      scripts.push(script);
+      return Promise.resolve(undefined);
+    },
+  });
+}
+
 function makeWindow(): FakeWindow {
   const showListeners: Listener[] = [];
   const win: FakeWindow = {
+    webContents: makeWebContents(),
     vibrancyCalls: [],
     materialCalls: [],
     setVibrancy: (material) => win.vibrancyCalls.push(material),
@@ -280,6 +298,66 @@ test("file change re-applies to open windows", async (t) => {
     "sidebar",
     `timed out after 2s waiting for the debounced fs.watch re-apply; calls so far: ${JSON.stringify(win.vibrancyCalls)}`,
   );
+});
+
+function rendererState(win: FakeWindow, fromScript = 0): { tint?: string; paneBg?: string; openFilesInNewTab?: unknown } {
+  const style: Record<string, string> = {};
+  const document = { documentElement: { style: { setProperty: (name: string, value: string) => (style[name] = value) } } };
+  const pageGlobal: Record<string, unknown> = {};
+  for (const script of win.webContents.scripts.slice(fromScript)) {
+    new Function("document", "globalThis", script)(document, pageGlobal);
+  }
+  return { tint: style["--paseo-tint"], paneBg: style["--paseo-pane-bg"], openFilesInNewTab: pageGlobal.__paseoOpenFilesInNewTab };
+}
+
+test("renderer: each page load gets this device's tint, pane glass and new-tab setting from its own file", (t) => {
+  const { dir, watchers } = settingsDir(t);
+  writeFileSync(join(dir, "paseo-vibrancy.json"), JSON.stringify({ tint: 0.4, paneGlass: true, openFilesInNewTab: true }));
+
+  const sandbox = loadPvJs(dir, watchers);
+  const win = makeWindow();
+  sandbox.fireBrowserWindowCreated(win);
+  win.webContents.emit("dom-ready");
+
+  assert.deepEqual(rendererState(win), { tint: "0.4", paneBg: "transparent", openFilesInNewTab: true });
+
+  const reloadedFrom = win.webContents.scripts.length;
+  win.webContents.emit("dom-ready");
+  assert.deepEqual(rendererState(win, reloadedFrom), { tint: "0.4", paneBg: "transparent", openFilesInNewTab: true });
+});
+
+test("renderer: pane glass off uses the surface1 token; no settings file gives the defaults", (t) => {
+  const { dir, watchers } = settingsDir(t);
+  const empty = settingsDir(t);
+  writeFileSync(join(dir, "paseo-vibrancy.json"), JSON.stringify({ tint: 0.2, paneGlass: false }));
+
+  const opaque = makeWindow();
+  loadPvJs(dir, watchers).fireBrowserWindowCreated(opaque);
+  opaque.webContents.emit("dom-ready");
+  const fresh = makeWindow();
+  loadPvJs(empty.dir, empty.watchers).fireBrowserWindowCreated(fresh);
+  fresh.webContents.emit("dom-ready");
+
+  assert.deepEqual(rendererState(opaque), { tint: "0.2", paneBg: "var(--colors-surface1)", openFilesInNewTab: false });
+  assert.deepEqual(rendererState(fresh), { tint: "0.85", paneBg: "transparent", openFilesInNewTab: false });
+});
+
+test("renderer: a settings file change re-applies to open windows", async (t) => {
+  const { dir, watchers } = settingsDir(t);
+
+  const sandbox = loadPvJs(dir, watchers);
+  const win = makeWindow();
+  sandbox.fireBrowserWindowCreated(win);
+  win.webContents.emit("dom-ready");
+  const changed = { tint: "0.3", paneBg: "var(--colors-surface1)", openFilesInNewTab: true };
+
+  await writeUntil(
+    join(dir, "paseo-vibrancy.json"),
+    JSON.stringify({ tint: 0.3, paneGlass: false, openFilesInNewTab: true }),
+    () => rendererState(win).tint === changed.tint,
+  );
+
+  assert.deepEqual(rendererState(win), changed, "timed out after 2s waiting for the settings watcher to re-apply to the page");
 });
 
 test("module export is true", (t) => {

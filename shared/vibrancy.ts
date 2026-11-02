@@ -42,7 +42,6 @@ function defaultMaterial(platform: HostPlatform): Material {
 export const CURSOR_STYLES = ["bar", "block", "underline"] as const;
 export const ANSI_PALETTES = ["oxocarbon", "paseo"] as const;
 
-/** Global the client plugin sets and the patched renderer reads at call time. */
 export const OPEN_FILES_IN_NEW_TAB_GLOBAL = "__paseoOpenFilesInNewTab";
 
 export const TERMINAL_DEFAULTS = {
