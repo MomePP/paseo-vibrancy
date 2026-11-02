@@ -64,7 +64,7 @@ Settings are per device: each device's look follows its own settings file, and t
 
 ### Appearance
 
-Applied live on that host's device, without a restart.
+Applied live on that host's device, without a restart. The first build after updating the plugin is needed to carry the hook that applies tint and main pane glass.
 
 | Control | Range | Default | Effect |
 | --- | --- | --- | --- |
