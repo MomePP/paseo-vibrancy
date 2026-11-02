@@ -44,7 +44,7 @@ paseo-plugin.json          { "id": "paseo-vibrancy", "requirements": { "paseo": 
 package.json, tsconfig.json
 index.client.tsx            settings screen contribution (renderer)
 index.server.ts             registers the five RPC handlers (daemon subprocess)
-client/                     VibrancyScreen, RangeRow, live-settings.ts (CSS variable applier)
+client/                     VibrancyScreen, RangeRow, update-notice.ts
 server/                     asar.ts, build.ts, ghostty.ts, main-hook.ts, blur.ts,
                              patch-engine.ts, patch-renderer.ts, renderer-patches.ts,
                              release.ts, status.ts, swap.ts, settings-file.ts
@@ -55,9 +55,9 @@ test/                       node --test
 
 | Part | Runtime | Role |
 | --- | --- | --- |
-| `index.client.tsx`, `client/` | renderer | Vibrancy settings screen, live `--paseo-*` CSS variables, update notice |
+| `index.client.tsx`, `client/` | renderer | Vibrancy settings screen, update notice |
 | `index.server.ts`, `server/` | daemon subprocess (full Node) | release fetch/verify, build, swap, settings file |
-| `pv.js` (generated into the bundle) | Paseo's Electron main process | per-window material/blur, watches the settings file, WebHID chooser for browser tabs |
+| `pv.js` (generated into the bundle) | Paseo's Electron main process | per-window material/blur, live `--paseo-*` CSS variables and new-tab flag in each window's page, watches the settings file, WebHID chooser for browser tabs |
 | `blur.node` (compiled into the bundle) | Paseo's Electron main process | `setBlur(handle, radius)` via private CGS calls, `dlsym`'d so a missing symbol is a no-op, not a crash; `matchCorners(handle)` keeps the window server's corner radius equal to AppKit's |
 
 ## WebHID chooser for browser tabs (`pv.js`)
@@ -114,8 +114,13 @@ Schema lives in `shared/vibrancy.ts`, persisted by the server to
 
 Defaults: `{ material: "none", blurRadius: 30, tint: 0.85, paneGlass: true,
 openFilesInNewTab: false, webHidChooser: true }`. `pv.js` parses
-`webHidChooser` alongside the appearance fields (same default), so the
-chooser follows the file without a restart.
+`openFilesInNewTab` and `webHidChooser` alongside the appearance fields (same
+defaults), so both follow the file without a restart.
+
+Every live value is applied by `pv.js` on the device that owns the file, never
+by the plugin client (see the per-host client gotcha below). The Vibrancy
+screen saves to the host picked in its header; that host's daemon writes its
+own file, and that device's `pv.js` picks the change up.
 
 - **Main process (`pv.js`).** Loaded by the asar window-options hook line
   `transparent:require(process.resourcesPath+"/pv.js"),visualEffectState:"active",`
@@ -130,7 +135,9 @@ chooser follows the file without a restart.
   `"none"`: `win.setVibrancy(null)` and `blur.setBlur(handle, blurRadius)`.
   Every `apply` also calls `blur.matchCorners(handle)` (see the corners
   gotcha below).
-- **Renderer (`client/live-settings.ts`).** On load and on every change, sets on
+- **Renderer (also `pv.js`).** On every window's `webContents` `dom-ready`
+  (each load and reload) and on every settings-file change, `pv.js` runs a
+  small `executeJavaScript` script in the page that sets on
   `document.documentElement`:
   - `--paseo-tint` — consumed by the body wash rule:
     `background-color: color-mix(in srgb, var(--colors-surface1, <stock hex>) calc(var(--paseo-tint, <default>) * 100%), transparent);`
@@ -138,17 +145,19 @@ chooser follows the file without a restart.
     `var(--colors-surface1)`; consumed by the navigator backdrop patch.
 
   It also sets `globalThis.__paseoOpenFilesInNewTab`
-  (`OPEN_FILES_IN_NEW_TAB_GLOBAL`) to `openFilesInNewTab`, before the
-  `document` check. The renderer's `canReplacePreview` (file branch) is
+  (`OPEN_FILES_IN_NEW_TAB_GLOBAL`, interpolated into `PV_JS`) to
+  `openFilesInNewTab`. The renderer's `canReplacePreview` (file branch) is
   patched unconditionally to read that global at call time, so the toggle is
-  live; plugin disabled ⇒ flag undefined ⇒ stock behaviour. The first build
-  after updating the plugin is needed to carry the patch.
+  live; with the plugin disabled `pv.js` still sets it from the file, so the
+  last saved value stays in force. The first build after updating the plugin
+  is needed to carry the patch.
 - **Vibrancy screen** (`addSettingsScreen({ id: "vibrancy", title: "Vibrancy", … })`):
   five sections. Appearance: Material (`SettingsSelect`), Blur radius and Tint
   (styled `<input type="range">`), Main pane glass (`SettingsSwitch`); every
-  change calls `setSettings`, tint/pane apply locally at once rather than
-  waiting on the round trip. Tabs: Open files in a new tab (`SettingsSwitch`,
-  disabled like the Appearance controls). Browser: WebHID device chooser
+  change calls `setSettings` and saves (debounced) to the host picked in the
+  header; that device's `pv.js` applies it from the file. Tabs: Open files in
+  a new tab (`SettingsSwitch`, disabled like the Appearance controls).
+  Browser: WebHID device chooser
   (`SettingsSwitch`, disabled the same way; only the main process reads it).
   Terminal: the settings below (range rows fall
   back to selects off web); rows Ghostty overrides are disabled and hinted
@@ -439,6 +448,16 @@ update completing).
 - **RPC names must be lowercase** — see above; `defineRpc` throws otherwise.
 - **Theme tokens differ from Paseo's internal names** — see above; map by
   position (`buildDarkSemanticColors`'s own order), not by matching names.
+- **Each connected host evaluates its own client installation in one
+  renderer.** With the app connected to two daemons (say a Mac and a Windows
+  PC), Paseo runs `index.client.tsx` once per host in the same document, and
+  each installation's `client.rpc` goes to its own host. Client code that
+  wrote per-device state into the document (the old `client/live-settings.ts`
+  set `--paseo-tint`, `--paseo-pane-bg` and the new-tab flag) let the last
+  host to answer win: the Windows PC's tint and pane glass landed on the Mac.
+  The SDK doesn't say which host is local, so client code must never write
+  per-device state into the document; `pv.js` applies it from the device's
+  own settings file instead.
 - **`fs.watch` arming race in `pv.js`.** The settings-file watcher is
   debounced (50 ms) and set up once at load; a settings write that lands in
   the narrow window before the watcher is armed is missed until the *next*

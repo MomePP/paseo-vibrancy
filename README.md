@@ -60,9 +60,11 @@ Rebuilding restarts Paseo's daemon, which interrupts any running agents.
 
 ## Settings
 
+Settings are per device: each device's look follows its own settings file, and the Vibrancy screen edits the host picked in its header. If your app is connected to more than one host, changing another host's settings changes that device, not this one.
+
 ### Appearance
 
-Applied live, without a restart.
+Applied live on that host's device, without a restart.
 
 | Control | Range | Default | Effect |
 | --- | --- | --- | --- |
@@ -73,7 +75,7 @@ Applied live, without a restart.
 
 ### Tabs
 
-Applied live, without a restart. The first build after updating the plugin is needed to carry the patch this toggle relies on.
+Applied live on that host's device, without a restart. The first build after updating the plugin is needed to carry the patch this toggle relies on.
 
 | Control | Range | Default | Effect |
 | --- | --- | --- | --- |
@@ -81,7 +83,7 @@ Applied live, without a restart. The first build after updating the plugin is ne
 
 ### Browser
 
-Applied live, without a restart. The first build after updating the plugin is needed to carry the chooser this toggle switches.
+Applied live on that host's device, without a restart. The first build after updating the plugin is needed to carry the chooser this toggle switches.
 
 | Control | Range | Default | Effect |
 | --- | --- | --- | --- |
