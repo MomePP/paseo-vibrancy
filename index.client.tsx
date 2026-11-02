@@ -1,17 +1,17 @@
 /**
- * Client entry: registers the Vibrancy settings screen, applies the saved CSS
- * vars on load, and — since the SDK's toast is a component-only hook, not an
- * imperative call from `contribute()` — shows update and rebuild notices as a
- * conditional sidebar item (`client/update-notice.ts`) pointing at a surface
- * that renders the same Vibrancy screen, instead of a toast.
+ * Client entry: registers the Vibrancy settings screen and — since the SDK's
+ * toast is a component-only hook, not an imperative call from `contribute()` —
+ * shows update and rebuild notices as a conditional sidebar item
+ * (`client/update-notice.ts`) pointing at a surface that renders the same
+ * Vibrancy screen, instead of a toast. It applies no appearance itself: Paseo
+ * runs this entry once per connected host in the same renderer, so each
+ * device's look comes from its own `pv.js` and settings file instead.
  */
 
 import type { PluginClientContext, PluginScreenProps } from "@getpaseo/plugin/client";
 import type { PluginCleanup } from "@getpaseo/plugin";
 import { ScrollView } from "@getpaseo/plugin/client/react-native";
 
-import { getSettingsRpc } from "./shared/rpc.ts";
-import { applyLiveSettings } from "./client/live-settings.ts";
 import { watchUpdateNotice } from "./client/update-notice.ts";
 import VibrancyScreen from "./client/VibrancyScreen.tsx";
 
@@ -36,23 +36,9 @@ export default function contribute(client: PluginClientContext): PluginCleanup {
     Component: VibrancyScreen,
   });
 
-  let disposed = false;
-
-  client
-    .rpc(getSettingsRpc, {})
-    .then((settings) => {
-      if (!disposed) {
-        applyLiveSettings(settings);
-      }
-    })
-    .catch((error: unknown) => {
-      console.error("[vibrancy] getSettingsRpc failed on load", error);
-    });
-
   const noticeCleanup = watchUpdateNotice(client, UpdateScreen);
 
   return () => {
-    disposed = true;
     noticeCleanup();
     settingsCleanup();
   };

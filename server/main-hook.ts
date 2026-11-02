@@ -1,18 +1,24 @@
+import { OPEN_FILES_IN_NEW_TAB_GLOBAL } from "../shared/vibrancy.ts";
+
 /**
  * `PV_JS` is the CommonJS source written to the patched copy's resources
  * directory as `pv.js`. It is loaded by the asar hook line
  * (`server/asar.ts`'s `ASAR_HOOK_LINE`) while the first `BrowserWindow`'s
  * options object is still being evaluated — i.e. before any window exists —
  * so it runs entirely in Electron's main process and must be self-contained
- * (no imports from this plugin; everything the script needs is inlined
- * below). A throw at load time would break Paseo's launch, so all load-time
- * work is wrapped in a single try/catch and `module.exports = true` is
- * guaranteed regardless of what happens inside it.
+ * (no requires of this plugin's modules; the one shared name it needs is
+ * interpolated into the source below). A throw at load time would break
+ * Paseo's launch, so all load-time work is wrapped in a single try/catch and
+ * `module.exports = true` is guaranteed regardless of what happens inside it.
  *
  * macOS: `setVibrancy` plus the `blur.node` radius. Windows: the material
  * goes to `setBackgroundMaterial` (fixed blur, no addon); the lists and
- * defaults mirror `shared/vibrancy.ts`. Both: a WebHID device chooser for
- * Paseo's browser tabs, which stock Electron leaves to the app.
+ * defaults mirror `shared/vibrancy.ts`. Both: the live renderer values (tint,
+ * pane glass, new-tab flag) pushed into each window's page, and a WebHID
+ * device chooser for Paseo's browser tabs, which stock Electron leaves to the
+ * app. Everything comes from this device's own settings file: the plugin
+ * client runs once per connected host in the same renderer, so it can't
+ * apply per-device appearance without another host's settings winning.
  */
 
 export const PV_JS = `"use strict";
@@ -39,7 +45,14 @@ var MATERIALS = IS_WINDOWS
       "tooltip",
     ];
 
-var DEFAULTS = { material: IS_WINDOWS ? "acrylic" : "none", blurRadius: 30, tint: 0.85, paneGlass: true, webHidChooser: true };
+var DEFAULTS = {
+  material: IS_WINDOWS ? "acrylic" : "none",
+  blurRadius: 30,
+  tint: 0.85,
+  paneGlass: true,
+  openFilesInNewTab: false,
+  webHidChooser: true,
+};
 
 function clampNumber(value, fallback, min, max) {
   if (typeof value !== "number" || !isFinite(value)) {
@@ -55,6 +68,7 @@ function parseVibrancy(raw) {
     blurRadius: clampNumber(input.blurRadius, DEFAULTS.blurRadius, 0, 60),
     tint: clampNumber(input.tint, DEFAULTS.tint, 0, 1),
     paneGlass: typeof input.paneGlass === "boolean" ? input.paneGlass : DEFAULTS.paneGlass,
+    openFilesInNewTab: typeof input.openFilesInNewTab === "boolean" ? input.openFilesInNewTab : DEFAULTS.openFilesInNewTab,
     webHidChooser: typeof input.webHidChooser === "boolean" ? input.webHidChooser : DEFAULTS.webHidChooser,
   };
 }
@@ -128,6 +142,39 @@ try {
     } else {
       win.setVibrancy(null);
       setBlur(win.getNativeWindowHandle(), current.blurRadius);
+    }
+  }
+
+  // The renderer half: the body wash reads --paseo-tint, the navigator
+  // backdrop --paseo-pane-bg, and the patched file-tab reuse guard the
+  // new-tab global (see server/renderer-patches.ts). Sent on every page load
+  // and every settings change, so edits show without a reload.
+  var NEW_TAB_GLOBAL = ${JSON.stringify(OPEN_FILES_IN_NEW_TAB_GLOBAL)};
+
+  function rendererScript(settings) {
+    return (
+      "(function () {" +
+      "var style = document.documentElement.style;" +
+      "style.setProperty('--paseo-tint', " + JSON.stringify(String(settings.tint)) + ");" +
+      "style.setProperty('--paseo-pane-bg', " +
+      JSON.stringify(settings.paneGlass ? "transparent" : "var(--colors-surface1)") +
+      ");" +
+      "globalThis[" + JSON.stringify(NEW_TAB_GLOBAL) + "] = " + JSON.stringify(settings.openFilesInNewTab) + ";" +
+      "})();"
+    );
+  }
+
+  function applyRenderer(win) {
+    var contents = win && win.webContents;
+    if (!contents || typeof contents.executeJavaScript !== "function") {
+      return;
+    }
+    try {
+      contents.executeJavaScript(rendererScript(current)).catch(function () {
+        /* ignore — the page navigated away; its next dom-ready re-applies */
+      });
+    } catch (executeErr) {
+      /* ignore — the window's contents are already gone */
     }
   }
 
@@ -208,6 +255,12 @@ try {
         apply(win);
       });
     }
+    // dom-ready fires on every load and reload, each a fresh document.
+    if (win && win.webContents && typeof win.webContents.on === "function") {
+      win.webContents.on("dom-ready", function () {
+        applyRenderer(win);
+      });
+    }
   });
 
   // Electron leaves the WebHID chooser to the app: without a
@@ -281,7 +334,10 @@ try {
       clearTimeout(watchTimer);
       watchTimer = setTimeout(function () {
         current = readSettings();
-        BrowserWindow.getAllWindows().forEach(apply);
+        BrowserWindow.getAllWindows().forEach(function (win) {
+          apply(win);
+          applyRenderer(win);
+        });
       }, 50);
     });
     if (watcher && typeof watcher.unref === "function") {
