@@ -1,11 +1,8 @@
 /**
- * Client entry: registers the Vibrancy settings screen and — since the SDK's
- * toast is a component-only hook, not an imperative call from `contribute()` —
- * shows update and rebuild notices as a conditional sidebar item
- * (`client/update-notice.ts`) pointing at a surface that renders the same
- * Vibrancy screen, instead of a toast. It applies no appearance itself: Paseo
- * runs this entry once per connected host in the same renderer, so each
- * device's look comes from its own `pv.js` and settings file instead.
+ * The SDK's toast is hook-only (`useToast`), so update and rebuild notices are
+ * a conditional sidebar item instead. Paseo runs this entry once per connected
+ * host in one renderer, so it must never write per-device state into the
+ * document; `pv.js` applies each device's appearance from its own settings file.
  */
 
 import type { PluginClientContext, PluginScreenProps } from "@getpaseo/plugin/client";

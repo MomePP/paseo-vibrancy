@@ -12,7 +12,6 @@ import type { HostPlatform } from "../shared/platform.ts";
 
 type Listener = (...args: unknown[]) => void;
 
-/** A window's `webContents`: emits `dom-ready` on demand and records every script `pv.js` runs in the page. */
 interface FakeWebContents extends EventEmitter {
   scripts: string[];
   executeJavaScript: (script: string) => Promise<unknown>;
@@ -301,10 +300,6 @@ test("file change re-applies to open windows", async (t) => {
   );
 });
 
-/**
- * What a fresh page ends up with after running, in order, the scripts `pv.js`
- * sent to `win`'s renderer from the `fromScript`th on.
- */
 function rendererState(win: FakeWindow, fromScript = 0): { tint?: string; paneBg?: string; openFilesInNewTab?: unknown } {
   const style: Record<string, string> = {};
   const document = { documentElement: { style: { setProperty: (name: string, value: string) => (style[name] = value) } } };
@@ -326,7 +321,6 @@ test("renderer: each page load gets this device's tint, pane glass and new-tab s
 
   assert.deepEqual(rendererState(win), { tint: "0.4", paneBg: "transparent", openFilesInNewTab: true });
 
-  // A reload is a fresh page: dom-ready fires again and the new page gets the settings again.
   const reloadedFrom = win.webContents.scripts.length;
   win.webContents.emit("dom-ready");
   assert.deepEqual(rendererState(win, reloadedFrom), { tint: "0.4", paneBg: "transparent", openFilesInNewTab: true });

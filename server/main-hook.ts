@@ -16,9 +16,7 @@ import { OPEN_FILES_IN_NEW_TAB_GLOBAL } from "../shared/vibrancy.ts";
  * defaults mirror `shared/vibrancy.ts`. Both: the live renderer values (tint,
  * pane glass, new-tab flag) pushed into each window's page, and a WebHID
  * device chooser for Paseo's browser tabs, which stock Electron leaves to the
- * app. Everything comes from this device's own settings file: the plugin
- * client runs once per connected host in the same renderer, so it can't
- * apply per-device appearance without another host's settings winning.
+ * app.
  */
 
 export const PV_JS = `"use strict";
@@ -145,10 +143,6 @@ try {
     }
   }
 
-  // The renderer half: the body wash reads --paseo-tint, the navigator
-  // backdrop --paseo-pane-bg, and the patched file-tab reuse guard the
-  // new-tab global (see server/renderer-patches.ts). Sent on every page load
-  // and every settings change, so edits show without a reload.
   var NEW_TAB_GLOBAL = ${JSON.stringify(OPEN_FILES_IN_NEW_TAB_GLOBAL)};
 
   function rendererScript(settings) {
@@ -170,12 +164,8 @@ try {
       return;
     }
     try {
-      contents.executeJavaScript(rendererScript(current)).catch(function () {
-        /* ignore — the page navigated away; its next dom-ready re-applies */
-      });
-    } catch (executeErr) {
-      /* ignore — the window's contents are already gone */
-    }
+      contents.executeJavaScript(rendererScript(current)).catch(function () {});
+    } catch (executeErr) {}
   }
 
   // Electron can't maximize a transparent window natively on Windows, so it
@@ -255,7 +245,6 @@ try {
         apply(win);
       });
     }
-    // dom-ready fires on every load and reload, each a fresh document.
     if (win && win.webContents && typeof win.webContents.on === "function") {
       win.webContents.on("dom-ready", function () {
         applyRenderer(win);
