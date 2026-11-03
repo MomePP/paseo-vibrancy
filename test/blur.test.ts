@@ -9,6 +9,7 @@ import { compileBlur } from "../server/blur.ts";
 interface BlurExports {
   setBlur: (handle: Buffer, radius: number) => boolean;
   matchCorners: (handle: Buffer) => boolean;
+  setGlass: (handle: Buffer, variant: number) => boolean;
 }
 
 const macOnly = { skip: process.platform !== "darwin" ? "the blur addon is macOS-only (clang, AppKit)" : false };
@@ -26,6 +27,7 @@ test("compileBlur compiles blur.node and its exports reject a null-pointer buffe
     assert.equal(typeof addon.exports.setBlur, "function");
     assert.equal(addon.exports.setBlur(Buffer.alloc(8), 30), false);
     assert.equal(addon.exports.matchCorners(Buffer.alloc(8)), false);
+    assert.equal(addon.exports.setGlass(Buffer.alloc(8), 3), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
