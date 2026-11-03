@@ -27,6 +27,11 @@ test("parseVibrancy keeps only the platform's own materials; the other OS's fall
   assert.equal(parseVibrancy("not json", "win32").material, "acrylic");
 });
 
+test("parseVibrancy keeps a Liquid Glass material on macOS; on Windows it falls back to acrylic", () => {
+  assert.equal(parseVibrancy({ material: "glass-sidebar" }, "darwin").material, "glass-sidebar");
+  assert.equal(parseVibrancy({ material: "glass-sidebar" }, "win32").material, "acrylic");
+});
+
 test("parseVibrancy never throws, returns defaults for non-object input", () => {
   assert.deepEqual(parseVibrancy("not json"), VIBRANCY_DEFAULTS);
 });

@@ -28,7 +28,7 @@ import {
 import { useToast } from "@getpaseo/plugin/client/react-native";
 
 import { BUILD_STEPS } from "../shared/build-progress.ts";
-import { VIBRANCY_DEFAULTS, TERMINAL_DEFAULTS, materialsFor } from "../shared/vibrancy.ts";
+import { LIQUID_GLASS, VIBRANCY_DEFAULTS, TERMINAL_DEFAULTS, materialsFor } from "../shared/vibrancy.ts";
 import type { Material } from "../shared/vibrancy.ts";
 import type { VibrancySettings } from "../shared/vibrancy.ts";
 import { buildRpc, checkUpdateRpc, getSettingsRpc, setSettingsRpc, statusRpc } from "../shared/rpc.ts";
@@ -44,14 +44,21 @@ const BLUR_STEPS = [0, 10, 20, 30, 40, 50, 60];
 /** `0-100%` for the tint slider's native-platform fallback. */
 const TINT_STEPS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
-const materialOption = (material: Material) => ({
-  // "under-window" -> "Under Window": humanize the hyphenated material id.
-  label: material
-    .split("-")
-    .map((word) => word[0]!.toUpperCase() + word.slice(1))
-    .join(" "),
-  value: material,
-});
+const GLASS_LABELS = new Map<Material, string>(LIQUID_GLASS);
+
+const materialOption = (material: Material) => {
+  const glass = GLASS_LABELS.get(material);
+  return {
+    // "under-window" -> "Under Window": humanize the hyphenated material id.
+    label: glass
+      ? `Liquid Glass · ${glass}`
+      : material
+          .split("-")
+          .map((word) => word[0]!.toUpperCase() + word.slice(1))
+          .join(" "),
+    value: material,
+  };
+};
 
 const range = (min: number, max: number, step: number) =>
   Array.from({ length: Math.round((max - min) / step) + 1 }, (_, i) => Math.round((min + i * step) * 1000) / 1000);
