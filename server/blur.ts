@@ -192,6 +192,11 @@ static napi_value SetGlass(napi_env env, napi_callback_info info) {
       int32_t variant = -1;
       napi_get_value_int32(env, argv[1], &variant);
       Class glassClass = NSClassFromString(@"NSGlassEffectView");
+      // KVC on a missing private key throws, and that aborts Paseo's main process.
+      if (![glassClass instancesRespondToSelector:sel_registerName("_variant")] ||
+          ![glassClass instancesRespondToSelector:sel_registerName("set_variant:")]) {
+        glassClass = Nil;
+      }
 
       if ([NSThread isMainThread]) {
         present = ApplyGlass(window, glassClass, variant);

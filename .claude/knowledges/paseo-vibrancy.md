@@ -146,8 +146,11 @@ own file, and that device's `pv.js` picks the change up.
   `shared/vibrancy.ts` with `JSON.stringify`; the defaults are hand-mirrored.
   The glass view sits at the bottom of `window.contentView`, where Electron
   puts its `NSVisualEffectView`, one per window (an associated object). A
-  glass view that has drawn ignores a new `_variant`, so a variant change
-  removes it and creates a new one.
+  glass view whose `_variant` differs is removed and recreated (DiaTweaks
+  does the same, saying a drawn glass view ignores a new variant).
+  `setGlass` treats the class as missing unless it responds to `_variant`
+  and `set_variant:`, so a macOS that drops the private key gets the blur
+  fallback instead of an uncaught `NSUnknownKeyException`.
 - **Renderer (also `pv.js`).** On every window's `webContents` `dom-ready`
   (each load and reload) and on every settings-file change, `pv.js` runs a
   small `executeJavaScript` script in the page that sets on

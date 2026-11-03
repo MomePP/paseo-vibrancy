@@ -69,7 +69,7 @@ Applied live on that host's device, without a restart. The first build after upd
 | Control | Range | Default | Effect |
 | --- | --- | --- | --- |
 | Material | macOS: `none`, `sidebar`, `hud`, `under-window`, ..., then 24 Liquid Glass variants (`glass-regular`, `glass-clear`, `glass-sidebar`, ...); Windows: `acrylic`, `mica`, `tabbed`, `none` | macOS `none`, Windows `acrylic` | On macOS an Apple vibrancy material, where `none` uses the blur radius instead, or a Liquid Glass variant (macOS 26 or later; older macOS uses the blur radius instead). On Windows a Windows 11 backdrop; `none` turns it off. |
-| Blur radius | 0 - 60 | 30 | macOS only: background blur behind the window, used when Material is `none` or a Liquid Glass variant the system lacks. Windows' materials have a fixed blur. |
+| Blur radius | 0 - 60 | 30 | macOS only: background blur behind the window, used when Material is `none`. A Liquid Glass variant on macOS older than 26 falls back to the radius last set here. Windows' materials have a fixed blur. |
 | Tint | 0 - 100% | 85% | How much of the theme colour washes over the blur. |
 | Main pane glass | on / off | on | Extends the glass behind chats and editors; off keeps the main pane solid. |
 
