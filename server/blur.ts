@@ -146,9 +146,6 @@ static napi_value MatchCorners(napi_env env, napi_callback_info info) {
 
 static char GlassViewKey;
 
-// One glass view per window, at the bottom of the content view where Electron
-// puts its NSVisualEffectView. A glass view that has drawn ignores a new
-// variant, so a variant change replaces the view.
 static BOOL ApplyGlass(NSWindow *window, Class glassClass, int32_t variant) {
   NSView *glass = objc_getAssociatedObject(window, &GlassViewKey);
   if (glass != nil && (variant < 0 || [[glass valueForKey:@"_variant"] intValue] != variant)) {

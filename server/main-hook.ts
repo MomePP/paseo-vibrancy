@@ -10,14 +10,6 @@ import { GLASS_MATERIALS, MAC_MATERIALS, OPEN_FILES_IN_NEW_TAB_GLOBAL, WINDOWS_M
  * interpolated into the source below). A throw at load time would break
  * Paseo's launch, so all load-time work is wrapped in a single try/catch and
  * `module.exports = true` is guaranteed regardless of what happens inside it.
- *
- * macOS: `setVibrancy` plus the `blur.node` radius, or a `blur.node` Liquid
- * Glass view for a `glass-*` material. Windows: the material goes to
- * `setBackgroundMaterial` (fixed blur, no addon). The material lists come from
- * `shared/vibrancy.ts`; the defaults mirror it. Both: the live renderer values
- * (tint, pane glass, new-tab flag) pushed into each window's page, and a WebHID
- * device chooser for Paseo's browser tabs, which stock Electron leaves to the
- * app.
  */
 
 export const PV_JS = `"use strict";
@@ -100,7 +92,6 @@ try {
       try {
         return blur.setGlass(handle, variant);
       } catch (setGlassErr) {
-        /* ignore — best-effort, like blur */
       }
     }
     return false;
@@ -131,12 +122,10 @@ try {
     }
     var handle = win.getNativeWindowHandle();
     matchCorners(handle);
-    // Always called, so switching to another material removes the glass view.
     var variant = GLASS_MATERIALS.indexOf(current.material);
     var glassShown = setGlass(handle, variant);
     if (variant !== -1) {
       win.setVibrancy(null);
-      // Before macOS 26 there is no glass view; the blur radius stands in.
       setBlur(handle, glassShown ? 0 : current.blurRadius);
     } else if (current.material !== "none") {
       win.setVibrancy(current.material);

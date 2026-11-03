@@ -45,9 +45,7 @@ interface Sandbox {
   /** The button index the next message box resolves with. */
   dialogResponse: number;
   fireWebContentsCreated: (contents: { getType: () => string; session: EventEmitter }) => void;
-  /** The `_variant` of every `setGlass` call, in order; -1 removes the glass view. */
   glassVariants: number[];
-  /** Whether the fake addon's `setGlass` finds NSGlassEffectView (macOS 26+). */
   glassSupported: boolean;
 }
 

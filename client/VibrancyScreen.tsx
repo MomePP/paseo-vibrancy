@@ -49,7 +49,6 @@ const GLASS_LABELS = new Map<Material, string>(LIQUID_GLASS);
 const materialOption = (material: Material) => {
   const glass = GLASS_LABELS.get(material);
   return {
-    // "under-window" -> "Under Window": humanize the hyphenated material id.
     label: glass
       ? `Liquid Glass · ${glass}`
       : material
