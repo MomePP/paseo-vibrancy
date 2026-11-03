@@ -52,7 +52,6 @@ export const LIQUID_GLASS = [
 
 export const GLASS_MATERIALS = LIQUID_GLASS.map(([id]) => id);
 
-/** macOS materials: the vibrancy ones, then the Liquid Glass variants (macOS 26+). */
 export const MAC_MATERIALS = [...VIBRANCY_MATERIALS, ...GLASS_MATERIALS];
 
 /** `BrowserWindow.setBackgroundMaterial` values (Windows 11 22H2+); "none" leaves the window see-through with no blur. */
