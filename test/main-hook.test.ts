@@ -45,6 +45,10 @@ interface Sandbox {
   /** The button index the next message box resolves with. */
   dialogResponse: number;
   fireWebContentsCreated: (contents: { getType: () => string; session: EventEmitter }) => void;
+  /** The `_variant` of every `setGlass` call, in order; -1 removes the glass view. */
+  glassVariants: number[];
+  /** Whether the fake addon's `setGlass` finds NSGlassEffectView (macOS 26+). */
+  glassSupported: boolean;
 }
 
 function makeWebContents(): FakeWebContents {
@@ -167,6 +171,8 @@ function loadPvJs(
     },
     dialogs: [],
     dialogResponse: 0,
+    glassVariants: [],
+    glassSupported: true,
     fireWebContentsCreated: (contents) => {
       for (const listener of webContentsListeners) {
         listener({}, contents);
@@ -180,6 +186,10 @@ function loadPvJs(
       sandbox.dlopened = true;
       addonModule.exports.setBlur = (handle: Buffer, radius: number) => {
         blurCalls.push({ handle, radius });
+      };
+      addonModule.exports.setGlass = (_handle: Buffer, variant: number) => {
+        sandbox.glassVariants.push(variant);
+        return sandbox.glassSupported && variant >= 0;
       };
     },
   };
@@ -298,6 +308,49 @@ test("file change re-applies to open windows", async (t) => {
     "sidebar",
     `timed out after 2s waiting for the debounced fs.watch re-apply; calls so far: ${JSON.stringify(win.vibrancyCalls)}`,
   );
+});
+
+test("macOS: a Liquid Glass material shows that glass variant with no vibrancy and no blur", (t) => {
+  const { dir, watchers } = settingsDir(t);
+  writeFileSync(join(dir, "paseo-vibrancy.json"), JSON.stringify({ material: "glass-sidebar", blurRadius: 22 }));
+
+  const sandbox = loadPvJs(dir, watchers);
+  const win = makeWindow();
+  sandbox.fireBrowserWindowCreated(win);
+
+  assert.deepEqual(sandbox.glassVariants, [16]);
+  assert.deepEqual(win.vibrancyCalls, [null]);
+  assert.equal(sandbox.blurCalls.at(-1)?.radius, 0);
+});
+
+test("macOS without NSGlassEffectView: a Liquid Glass material falls back to the blur radius", (t) => {
+  const { dir, watchers } = settingsDir(t);
+  writeFileSync(join(dir, "paseo-vibrancy.json"), JSON.stringify({ material: "glass-sidebar", blurRadius: 22 }));
+
+  const sandbox = loadPvJs(dir, watchers);
+  sandbox.glassSupported = false;
+  const win = makeWindow();
+  sandbox.fireBrowserWindowCreated(win);
+
+  assert.deepEqual(win.vibrancyCalls, [null]);
+  assert.equal(sandbox.blurCalls.at(-1)?.radius, 22);
+});
+
+test("macOS: switching from a Liquid Glass material to a vibrancy one removes the glass view", async (t) => {
+  const { dir, watchers } = settingsDir(t);
+  const settingsFile = join(dir, "paseo-vibrancy.json");
+  writeFileSync(settingsFile, JSON.stringify({ material: "glass-sidebar" }));
+
+  const sandbox = loadPvJs(dir, watchers);
+  const win = makeWindow();
+  sandbox.fireBrowserWindowCreated(win);
+
+  await writeUntil(settingsFile, JSON.stringify({ material: "sidebar" }), () => win.vibrancyCalls.at(-1) === "sidebar");
+
+  assert.equal(win.vibrancyCalls.at(-1), "sidebar", "timed out after 2s waiting for the settings watcher to re-apply");
+  assert.equal(sandbox.glassVariants[0], 16);
+  assert.equal(sandbox.glassVariants.at(-1), -1);
+  assert.equal(sandbox.blurCalls.at(-1)?.radius, 0);
 });
 
 function rendererState(win: FakeWindow, fromScript = 0): { tint?: string; paneBg?: string; openFilesInNewTab?: unknown } {
