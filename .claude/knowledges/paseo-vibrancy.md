@@ -57,8 +57,8 @@ test/                       node --test
 | --- | --- | --- |
 | `index.client.tsx`, `client/` | renderer | Vibrancy settings screen, update notice |
 | `index.server.ts`, `server/` | daemon subprocess (full Node) | release fetch/verify, build, swap, settings file |
-| `pv.js` (generated into the bundle) | Paseo's Electron main process | per-window material/blur, live `--paseo-*` CSS variables and new-tab flag in each window's page, watches the settings file, WebHID chooser for browser tabs |
-| `blur.node` (compiled into the bundle) | Paseo's Electron main process | `setBlur(handle, radius)` via private CGS calls, `dlsym`'d so a missing symbol is a no-op, not a crash; `matchCorners(handle)` keeps the window server's corner radius equal to AppKit's |
+| `pv.js` (generated into the bundle) | Paseo's Electron main process | per-window material/Liquid Glass/blur, live `--paseo-*` CSS variables and new-tab flag in each window's page, watches the settings file, WebHID chooser for browser tabs |
+| `blur.node` (compiled into the bundle) | Paseo's Electron main process | `setBlur(handle, radius)` via private CGS calls, `dlsym`'d so a missing symbol is a no-op, not a crash; `matchCorners(handle)` keeps the window server's corner radius equal to AppKit's; `setGlass(handle, variant)` adds, swaps or (variant < 0) removes the window's Liquid Glass `NSGlassEffectView` (macOS 26+; `false` without the class) |
 
 ## WebHID chooser for browser tabs (`pv.js`)
 
@@ -104,8 +104,9 @@ Schema lives in `shared/vibrancy.ts`, persisted by the server to
 ```ts
 { material: "none" | "sidebar" | "hud" | "under-window" | "fullscreen-ui"
             | "menu" | "popover" | "titlebar" | "header" | "sheet"
-            | "window" | "content" | "under-page" | "selection" | "tooltip",
-  blurRadius: number,   // 0–60, used when material is "none"
+            | "window" | "content" | "under-page" | "selection" | "tooltip"
+            | "glass-regular" | … | "glass-cartouche-popover",  // 24 LIQUID_GLASS ids
+  blurRadius: number,   // 0–60, used when material is "none" (or glass is unavailable)
   tint: number,         // 0–1
   paneGlass: boolean,
   openFilesInNewTab: boolean,
@@ -130,11 +131,23 @@ own file, and that device's `pv.js` picks the change up.
   `module.exports = true`, so the `require` yields `transparent: true`.
   `visualEffectState` rides in the same slot because Electron has no runtime
   setter for it — it only keeps a material from going flat when the window
-  loses focus, read once by `setVibrancy`. Material ≠ `"none"`:
-  `win.setVibrancy(material)` and `blur.setBlur(handle, 0)`. Material
-  `"none"`: `win.setVibrancy(null)` and `blur.setBlur(handle, blurRadius)`.
-  Every `apply` also calls `blur.matchCorners(handle)` (see the corners
-  gotcha below).
+  loses focus, read once by `setVibrancy`. A `glass-*` material:
+  `blur.setGlass(handle, variant)`, where `variant` is the id's index in
+  `LIQUID_GLASS` (`shared/vibrancy.ts`, AppKit's `_variant` order, copied
+  from DiaTweaks' `DPGlasses`), plus `win.setVibrancy(null)` and
+  `blur.setBlur(handle, 0)`; when `setGlass` returns `false` (no
+  `NSGlassEffectView` before macOS 26) the blur radius stands in. Any other
+  material ≠ `"none"`: `win.setVibrancy(material)` and
+  `blur.setBlur(handle, 0)`. Material `"none"`: `win.setVibrancy(null)` and
+  `blur.setBlur(handle, blurRadius)`. Every `apply` calls
+  `blur.setGlass(handle, -1)` for a non-glass material, so switching away
+  removes the glass view, and `blur.matchCorners(handle)` first (see the
+  corners gotcha below). The material lists are interpolated from
+  `shared/vibrancy.ts` with `JSON.stringify`; the defaults are hand-mirrored.
+  The glass view sits at the bottom of `window.contentView`, where Electron
+  puts its `NSVisualEffectView`, one per window (an associated object). A
+  glass view that has drawn ignores a new `_variant`, so a variant change
+  removes it and creates a new one.
 - **Renderer (also `pv.js`).** On every window's `webContents` `dom-ready`
   (each load and reload) and on every settings-file change, `pv.js` runs a
   small `executeJavaScript` script in the page that sets on
@@ -270,8 +283,9 @@ version being built (`cachedPristine`).
    `"paseo"` the stock palette stays and no note is emitted for it.
 4. Write `pv.js` (`server/main-hook.ts`); compile `blur.node`
    (`server/blur.ts`) with `clang -bundle -undefined dynamic_lookup -framework AppKit -fobjc-arc`.
-   A failed compile reports `MISSED window blur: <reason>` but materials
-   keep working — blur is best-effort, not load-bearing.
+   A failed compile reports `MISSED window blur: <reason>` but the vibrancy
+   materials keep working — blur and Liquid Glass are best-effort, not
+   load-bearing.
 5. `app-update.yml` → `DEAD_UPDATE_YML`, a neutered `provider: generic`
    pointing at `https://127.0.0.1:1/paseo-vibrancy-disabled/`, an address
    that cannot resolve. Asserted (the file must exist first), not written
