@@ -70,7 +70,11 @@ function makeWindow(): FakeWindow {
     materialCalls: [],
     backgroundColors: [],
     setVibrancy: (material) => win.vibrancyCalls.push(material),
-    setBackgroundMaterial: (material) => win.materialCalls.push(material),
+    // Electron resets the window colour: white for "none", transparent for a material.
+    setBackgroundMaterial: (material) => {
+      win.materialCalls.push(material);
+      win.backgroundColors.push(material === "none" ? "#FFFFFF" : "#00000000");
+    },
     setBackgroundColor: (color) => win.backgroundColors.push(color),
     getNativeWindowHandle: () => Buffer.alloc(8),
     on: (event, listener) => {
@@ -453,9 +457,9 @@ test("Windows: none turns the backdrop off and shows Paseo's own colours, not El
   micaWin.webContents.emit("dom-ready");
 
   assert.deepEqual(noneWin.materialCalls, ["none"]);
-  assert.deepEqual(noneWin.backgroundColors, ["#181B1A"], "Paseo's dark window colour before the page paints");
+  assert.equal(noneWin.backgroundColors.at(-1), "#181B1A", "Paseo's dark window colour before the page paints");
   assert.equal(rendererState(noneWin).tint, "1", "nothing behind the page to tint over");
-  assert.deepEqual(micaWin.backgroundColors, [], "an opaque window colour would hide Mica");
+  assert.equal(micaWin.backgroundColors.at(-1), "#00000000", "an opaque window colour would hide Mica");
   assert.equal(rendererState(micaWin).tint, "0.1");
 });
 
@@ -469,6 +473,25 @@ test("Windows: file change re-applies to open windows", async (t) => {
   await writeUntil(join(dir, "paseo-vibrancy.json"), JSON.stringify({ material: "tabbed" }), () => win.materialCalls.at(-1) === "tabbed");
 
   assert.equal(win.materialCalls.at(-1), "tabbed", `calls so far: ${JSON.stringify(win.materialCalls)}`);
+});
+
+test("Windows: switching live between Mica and none swaps the window colour and the page tint", async (t) => {
+  const { dir, watchers } = settingsDir(t);
+  const settingsFile = join(dir, "paseo-vibrancy.json");
+  writeFileSync(settingsFile, JSON.stringify({ material: "mica", tint: 0.2 }));
+
+  const sandbox = loadPvJs(dir, watchers, "win32");
+  const win = makeWindow();
+  sandbox.fireBrowserWindowCreated(win);
+  win.webContents.emit("dom-ready");
+
+  await writeUntil(settingsFile, JSON.stringify({ material: "none", tint: 0.2 }), () => rendererState(win).tint === "1");
+  assert.equal(win.backgroundColors.at(-1), "#181B1A");
+  assert.equal(rendererState(win).tint, "1");
+
+  await writeUntil(settingsFile, JSON.stringify({ material: "mica", tint: 0.2 }), () => rendererState(win).tint === "0.2");
+  assert.equal(win.backgroundColors.at(-1), "#00000000");
+  assert.equal(rendererState(win).tint, "0.2");
 });
 
 test("maximize is left to Electron on both OSes", (t) => {
