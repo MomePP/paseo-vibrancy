@@ -1,4 +1,4 @@
-import { OPEN_FILES_IN_NEW_TAB_GLOBAL } from "../shared/vibrancy.ts";
+import { GLASS_MATERIALS, MAC_MATERIALS, OPEN_FILES_IN_NEW_TAB_GLOBAL, WINDOWS_MATERIALS } from "../shared/vibrancy.ts";
 
 /**
  * `PV_JS` is the CommonJS source written to the patched copy's resources
@@ -6,42 +6,19 @@ import { OPEN_FILES_IN_NEW_TAB_GLOBAL } from "../shared/vibrancy.ts";
  * (`server/asar.ts`'s `ASAR_HOOK_LINE`) while the first `BrowserWindow`'s
  * options object is still being evaluated — i.e. before any window exists —
  * so it runs entirely in Electron's main process and must be self-contained
- * (no requires of this plugin's modules; the one shared name it needs is
+ * (no requires of this plugin's modules; the shared names it needs are
  * interpolated into the source below). A throw at load time would break
  * Paseo's launch, so all load-time work is wrapped in a single try/catch and
  * `module.exports = true` is guaranteed regardless of what happens inside it.
- *
- * macOS: `setVibrancy` plus the `blur.node` radius. Windows: the material
- * goes to `setBackgroundMaterial` (fixed blur, no addon); the lists and
- * defaults mirror `shared/vibrancy.ts`. Both: the live renderer values (tint,
- * pane glass, new-tab flag) pushed into each window's page, and a WebHID
- * device chooser for Paseo's browser tabs, which stock Electron leaves to the
- * app.
  */
 
 export const PV_JS = `"use strict";
 
 var IS_WINDOWS = process.platform === "win32";
 
-var MATERIALS = IS_WINDOWS
-  ? ["none", "acrylic", "mica", "tabbed"]
-  : [
-      "none",
-      "sidebar",
-      "hud",
-      "under-window",
-      "fullscreen-ui",
-      "menu",
-      "popover",
-      "titlebar",
-      "header",
-      "sheet",
-      "window",
-      "content",
-      "under-page",
-      "selection",
-      "tooltip",
-    ];
+var MATERIALS = IS_WINDOWS ? ${JSON.stringify(WINDOWS_MATERIALS)} : ${JSON.stringify(MAC_MATERIALS)};
+
+var GLASS_MATERIALS = ${JSON.stringify(GLASS_MATERIALS)};
 
 var DEFAULTS = {
   material: IS_WINDOWS ? "acrylic" : "none",
@@ -110,6 +87,16 @@ try {
     }
   }
 
+  function setGlass(handle, variant) {
+    if (blur && typeof blur.setGlass === "function") {
+      try {
+        return blur.setGlass(handle, variant);
+      } catch (setGlassErr) {
+      }
+    }
+    return false;
+  }
+
   var settingsPath = path.join(app.getPath("userData"), "paseo-vibrancy.json");
 
   function readSettings() {
@@ -133,13 +120,19 @@ try {
     if (!win || typeof win.setVibrancy !== "function") {
       return;
     }
-    matchCorners(win.getNativeWindowHandle());
-    if (current.material !== "none") {
+    var handle = win.getNativeWindowHandle();
+    matchCorners(handle);
+    var variant = GLASS_MATERIALS.indexOf(current.material);
+    var glassShown = setGlass(handle, variant);
+    if (variant !== -1) {
+      win.setVibrancy(null);
+      setBlur(handle, glassShown ? 0 : current.blurRadius);
+    } else if (current.material !== "none") {
       win.setVibrancy(current.material);
-      setBlur(win.getNativeWindowHandle(), 0);
+      setBlur(handle, 0);
     } else {
       win.setVibrancy(null);
-      setBlur(win.getNativeWindowHandle(), current.blurRadius);
+      setBlur(handle, current.blurRadius);
     }
   }
 

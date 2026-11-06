@@ -32,7 +32,7 @@ Paseo's window is opaque, and Electron gives plugins no way to change that. Pase
 
 - macOS on Apple silicon, or Windows 11 22H2 or later
 - [Paseo](https://paseo.sh) 0.11.0 or later, with **Settings > Plugins > Enable plugins** on
-- macOS: Xcode Command Line Tools (`xcode-select --install`) for the blur radius; without them, the Apple materials still work
+- macOS: Xcode Command Line Tools (`xcode-select --install`) for the blur radius and the Liquid Glass materials; without them, the Apple vibrancy materials still work
 
 On Windows 10, or Windows 11 before 22H2, the build refuses to run: those versions lack the blur materials.
 
@@ -68,8 +68,8 @@ Applied live on that host's device, without a restart. The first build after upd
 
 | Control | Range | Default | Effect |
 | --- | --- | --- | --- |
-| Material | macOS: `none`, `sidebar`, `hud`, `under-window`, ...; Windows: `acrylic`, `mica`, `tabbed`, `none` | macOS `none`, Windows `acrylic` | On macOS an Apple vibrancy material, where `none` uses the blur radius instead. On Windows a Windows 11 backdrop; `none` turns it off. |
-| Blur radius | 0 - 60 | 30 | macOS only: background blur behind the window, used when Material is `none`. Windows' materials have a fixed blur. |
+| Material | macOS: `none`, `sidebar`, `hud`, `under-window`, ..., then 24 Liquid Glass variants (`glass-regular`, `glass-clear`, `glass-sidebar`, ...); Windows: `acrylic`, `mica`, `tabbed`, `none` | macOS `none`, Windows `acrylic` | On macOS an Apple vibrancy material, where `none` uses the blur radius instead, or a Liquid Glass variant (macOS 26 or later; older macOS uses the blur radius instead). On Windows a Windows 11 backdrop; `none` turns it off. |
+| Blur radius | 0 - 60 | 30 | macOS only: background blur behind the window, used when Material is `none`. A Liquid Glass variant on macOS older than 26 falls back to the radius last set here. Windows' materials have a fixed blur. |
 | Tint | 0 - 100% | 85% | How much of the theme colour washes over the blur. |
 | Main pane glass | on / off | on | Extends the glass behind chats and editors; off keeps the main pane solid. |
 

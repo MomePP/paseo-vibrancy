@@ -4,7 +4,7 @@ import { HOST_PLATFORM } from "./platform.ts";
 import type { HostPlatform } from "./platform.ts";
 
 /** `BrowserWindow.setVibrancy` values; "none" means the blur radius below applies instead. */
-export const MAC_MATERIALS = [
+const VIBRANCY_MATERIALS = [
   "none",
   "sidebar",
   "hud",
@@ -21,6 +21,38 @@ export const MAC_MATERIALS = [
   "selection",
   "tooltip",
 ] as const;
+
+/** NSGlassEffectView's private `_variant`s in AppKit's order: the index is the variant number. */
+export const LIQUID_GLASS = [
+  ["glass-regular", "Regular"],
+  ["glass-clear", "Clear"],
+  ["glass-dock", "Dock"],
+  ["glass-app-icons", "App Icons"],
+  ["glass-widgets", "Widgets"],
+  ["glass-text", "Text"],
+  ["glass-av-player", "AV Player"],
+  ["glass-facetime", "FaceTime"],
+  ["glass-control-center", "Control Center"],
+  ["glass-notification-center", "Notification Center"],
+  ["glass-monogram", "Monogram"],
+  ["glass-bubbles", "Bubbles"],
+  ["glass-identity", "Identity"],
+  ["glass-focus-border", "Focus Border"],
+  ["glass-focus-platter", "Focus Platter"],
+  ["glass-keyboard", "Keyboard"],
+  ["glass-sidebar", "Sidebar"],
+  ["glass-abutted-sidebar", "Abutted Sidebar"],
+  ["glass-inspector", "Inspector"],
+  ["glass-control", "Control"],
+  ["glass-loupe", "Loupe"],
+  ["glass-slider", "Slider"],
+  ["glass-camera", "Camera"],
+  ["glass-cartouche-popover", "Cartouche Popover"],
+] as const;
+
+export const GLASS_MATERIALS = LIQUID_GLASS.map(([id]) => id);
+
+export const MAC_MATERIALS = [...VIBRANCY_MATERIALS, ...GLASS_MATERIALS];
 
 /** `BrowserWindow.setBackgroundMaterial` values (Windows 11 22H2+); "none" leaves the window see-through with no blur. */
 export const WINDOWS_MATERIALS = ["none", "acrylic", "mica", "tabbed"] as const;

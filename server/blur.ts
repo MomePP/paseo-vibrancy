@@ -2,13 +2,15 @@
  * `BLUR_M` is an Objective-C source file compiled into `Contents/Resources/blur.node`
  * by `compileBlur`. It is a hand-written N-API addon (no node headers — just the
  * handful of `napi_*` prototypes it calls, resolved at load time in the host
- * process via `-undefined dynamic_lookup`) exposing `setBlur(buffer, radius)` and
- * `matchCorners(buffer)`. `buffer` holds the `NSView*` returned by Electron's
- * `win.getNativeWindowHandle()`; both resolve `[view window]`. `setBlur` calls the
- * private `CGSSetWindowBackgroundBlurRadius` (via `dlsym`, so the addon still loads
- * — just becomes a no-op — if the symbols ever disappear) on the main thread.
- * `matchCorners` makes the window server's corner radius follow AppKit's corner
- * mask (see the comment above `MatchCorners`).
+ * process via `-undefined dynamic_lookup`) exposing `setBlur(buffer, radius)`,
+ * `matchCorners(buffer)` and `setGlass(buffer, variant)`. `buffer` holds the
+ * `NSView*` returned by Electron's `win.getNativeWindowHandle()`; all three resolve
+ * `[view window]`. `setBlur` calls the private `CGSSetWindowBackgroundBlurRadius`
+ * (via `dlsym`, so the addon still loads — just becomes a no-op — if the symbols
+ * ever disappear) on the main thread. `matchCorners` makes the window server's
+ * corner radius follow AppKit's corner mask (see the comment above `MatchCorners`).
+ * `setGlass` puts a Liquid Glass `NSGlassEffectView` (macOS 26+) of the given
+ * private `_variant` behind the window's content, or removes it for a negative one.
  */
 
 import { execFile } from "node:child_process";
@@ -142,6 +144,76 @@ static napi_value MatchCorners(napi_env env, napi_callback_info info) {
   return result;
 }
 
+static char GlassViewKey;
+
+static BOOL ApplyGlass(NSWindow *window, Class glassClass, int32_t variant) {
+  NSView *glass = objc_getAssociatedObject(window, &GlassViewKey);
+  if (glass != nil && (variant < 0 || [[glass valueForKey:@"_variant"] intValue] != variant)) {
+    [glass removeFromSuperview];
+    objc_setAssociatedObject(window, &GlassViewKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    glass = nil;
+  }
+
+  NSView *content = window.contentView;
+  if (glass == nil && variant >= 0 && glassClass != Nil && content != nil) {
+    glass = [[glassClass alloc] initWithFrame:content.bounds];
+    glass.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    CGFloat radius = 0;
+    SEL cornerRadius = sel_registerName("_cornerRadius");
+    if ([window respondsToSelector:cornerRadius]) {
+      radius = ((CGFloat (*)(id, SEL))objc_msgSend)(window, cornerRadius);
+    }
+    [glass setValue:@(radius) forKey:@"cornerRadius"];
+    [content addSubview:glass positioned:NSWindowBelow relativeTo:nil];
+    [glass setValue:@(variant) forKey:@"_variant"];
+    objc_setAssociatedObject(window, &GlassViewKey, glass, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+  }
+  return glass != nil;
+}
+
+static napi_value SetGlass(napi_env env, napi_callback_info info) {
+  size_t argc = 2;
+  napi_value argv[2];
+  napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
+
+  bool present = false;
+
+  void *data = NULL;
+  size_t length = 0;
+  if (argc >= 2) {
+    napi_get_buffer_info(env, argv[0], &data, &length);
+  }
+
+  if (data != NULL && length >= sizeof(void *)) {
+    NSView *view = *(NSView *__unsafe_unretained *)data;
+    NSWindow *window = view != nil ? [view window] : nil;
+
+    if (window != nil) {
+      int32_t variant = -1;
+      napi_get_value_int32(env, argv[1], &variant);
+      Class glassClass = NSClassFromString(@"NSGlassEffectView");
+      // KVC on a missing private key throws, and that aborts Paseo's main process.
+      if (![glassClass instancesRespondToSelector:sel_registerName("_variant")] ||
+          ![glassClass instancesRespondToSelector:sel_registerName("set_variant:")]) {
+        glassClass = Nil;
+      }
+
+      if ([NSThread isMainThread]) {
+        present = ApplyGlass(window, glassClass, variant);
+      } else {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          ApplyGlass(window, glassClass, variant);
+        });
+        present = glassClass != Nil && variant >= 0;
+      }
+    }
+  }
+
+  napi_value result;
+  napi_get_boolean(env, present, &result);
+  return result;
+}
+
 __attribute__((visibility("default")))
 napi_value napi_register_module_v1(napi_env env, napi_value exports) {
   napi_value fn;
@@ -149,6 +221,8 @@ napi_value napi_register_module_v1(napi_env env, napi_value exports) {
   napi_set_named_property(env, exports, "setBlur", fn);
   napi_create_function(env, "matchCorners", NAPI_AUTO_LENGTH, MatchCorners, NULL, &fn);
   napi_set_named_property(env, exports, "matchCorners", fn);
+  napi_create_function(env, "setGlass", NAPI_AUTO_LENGTH, SetGlass, NULL, &fn);
+  napi_set_named_property(env, exports, "setGlass", fn);
   return exports;
 }
 `;
