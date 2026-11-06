@@ -538,6 +538,11 @@ update completing).
   `Patcher.replaceReFirst` applies the first one present. A plain table entry
   per shape would leave the other shape MISSED, and the build stamp `missed`,
   on every version. Every patch applies on both 0.12.0-beta.1 and 0.13.0.
+- **Paseo 0.15.2 reordered the autocomplete styles.** `detailCard` now opens
+  `{flexShrink:1,minHeight:0,overflow:"hidden",backgroundColor:…}` and the
+  list `container` has `minHeight:46` (was 0). The anchors take
+  `\{[^{}]*?backgroundColor:` and `minHeight:\d+`, so the same entries match
+  0.13 and 0.15.2; a 0.15.2 build reports no `MISSED`.
 - **The client's SDK imports must exist on the oldest supported host.** The
   plugin client runs against the host Paseo's own SDK modules. SDK 0.13
   deprecates `@getpaseo/plugin/client/react-native` for `client/ui`, but
