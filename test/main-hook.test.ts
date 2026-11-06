@@ -20,9 +20,11 @@ interface FakeWebContents extends EventEmitter {
 interface FakeWindow {
   setVibrancy: (material: string | null) => void;
   setBackgroundMaterial: (material: string) => void;
+  setBackgroundColor: (color: string) => void;
   getNativeWindowHandle: () => Buffer;
   vibrancyCalls: Array<string | null>;
   materialCalls: string[];
+  backgroundColors: string[];
   on: (event: string, listener: Listener) => void;
   fireShow: () => void;
   webContents: FakeWebContents;
@@ -66,8 +68,14 @@ function makeWindow(): FakeWindow {
     webContents: makeWebContents(),
     vibrancyCalls: [],
     materialCalls: [],
+    backgroundColors: [],
     setVibrancy: (material) => win.vibrancyCalls.push(material),
-    setBackgroundMaterial: (material) => win.materialCalls.push(material),
+    // Electron resets the window colour: white for "none", transparent for a material.
+    setBackgroundMaterial: (material) => {
+      win.materialCalls.push(material);
+      win.backgroundColors.push(material === "none" ? "#FFFFFF" : "#00000000");
+    },
+    setBackgroundColor: (color) => win.backgroundColors.push(color),
     getNativeWindowHandle: () => Buffer.alloc(8),
     on: (event, listener) => {
       if (event === "show") {
@@ -129,6 +137,7 @@ function loadPvJs(
         return Promise.resolve({ response: sandbox.dialogResponse });
       },
     },
+    nativeTheme: { shouldUseDarkColors: true },
   };
 
   const trackedWatch = ((...args: Parameters<typeof watch>) => {
@@ -435,15 +444,23 @@ test("Windows: a saved Windows material applies; a macOS-only one falls back to 
   assert.deepEqual(macWin.materialCalls, ["acrylic"]);
 });
 
-test("Windows: none turns the background material off", (t) => {
+test("Windows: none turns the backdrop off and shows Paseo's own colours, not Electron's white", (t) => {
   const { dir, watchers } = settingsDir(t);
-  writeFileSync(join(dir, "paseo-vibrancy.json"), JSON.stringify({ material: "none" }));
+  writeFileSync(join(dir, "paseo-vibrancy.json"), JSON.stringify({ material: "none", tint: 0.1 }));
+  const noneWin = makeWindow();
+  loadPvJs(dir, watchers, "win32").fireBrowserWindowCreated(noneWin);
+  noneWin.webContents.emit("dom-ready");
 
-  const sandbox = loadPvJs(dir, watchers, "win32");
-  const win = makeWindow();
-  sandbox.fireBrowserWindowCreated(win);
+  writeFileSync(join(dir, "paseo-vibrancy.json"), JSON.stringify({ material: "mica", tint: 0.1 }));
+  const micaWin = makeWindow();
+  loadPvJs(dir, watchers, "win32").fireBrowserWindowCreated(micaWin);
+  micaWin.webContents.emit("dom-ready");
 
-  assert.deepEqual(win.materialCalls, ["none"]);
+  assert.deepEqual(noneWin.materialCalls, ["none"]);
+  assert.equal(noneWin.backgroundColors.at(-1), "#181B1A", "Paseo's dark window colour before the page paints");
+  assert.equal(rendererState(noneWin).tint, "1", "nothing behind the page to tint over");
+  assert.equal(micaWin.backgroundColors.at(-1), "#00000000", "an opaque window colour would hide Mica");
+  assert.equal(rendererState(micaWin).tint, "0.1");
 });
 
 test("Windows: file change re-applies to open windows", async (t) => {
@@ -456,6 +473,25 @@ test("Windows: file change re-applies to open windows", async (t) => {
   await writeUntil(join(dir, "paseo-vibrancy.json"), JSON.stringify({ material: "tabbed" }), () => win.materialCalls.at(-1) === "tabbed");
 
   assert.equal(win.materialCalls.at(-1), "tabbed", `calls so far: ${JSON.stringify(win.materialCalls)}`);
+});
+
+test("Windows: switching live between Mica and none swaps the window colour and the page tint", async (t) => {
+  const { dir, watchers } = settingsDir(t);
+  const settingsFile = join(dir, "paseo-vibrancy.json");
+  writeFileSync(settingsFile, JSON.stringify({ material: "mica", tint: 0.2 }));
+
+  const sandbox = loadPvJs(dir, watchers, "win32");
+  const win = makeWindow();
+  sandbox.fireBrowserWindowCreated(win);
+  win.webContents.emit("dom-ready");
+
+  await writeUntil(settingsFile, JSON.stringify({ material: "none", tint: 0.2 }), () => rendererState(win).tint === "1");
+  assert.equal(win.backgroundColors.at(-1), "#181B1A");
+  assert.equal(rendererState(win).tint, "1");
+
+  await writeUntil(settingsFile, JSON.stringify({ material: "mica", tint: 0.2 }), () => rendererState(win).tint === "0.2");
+  assert.equal(win.backgroundColors.at(-1), "#00000000");
+  assert.equal(rendererState(win).tint, "0.2");
 });
 
 test("maximize is left to Electron on both OSes", (t) => {

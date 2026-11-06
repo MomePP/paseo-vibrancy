@@ -68,9 +68,9 @@ Applied live on that host's device, without a restart. The first build after upd
 
 | Control | Range | Default | Effect |
 | --- | --- | --- | --- |
-| Material | macOS: `none`, `sidebar`, `hud`, `under-window`, ..., then 24 Liquid Glass variants (`glass-regular`, `glass-clear`, `glass-sidebar`, ...); Windows: `acrylic`, `mica`, `tabbed`, `none` | macOS `none`, Windows `acrylic` | On macOS an Apple vibrancy material, where `none` uses the blur radius instead, or a Liquid Glass variant (macOS 26 or later; older macOS uses the blur radius instead). On Windows a Windows 11 backdrop; `none` turns it off. |
+| Material | macOS: `none`, `sidebar`, `hud`, `under-window`, ..., then 24 Liquid Glass variants (`glass-regular`, `glass-clear`, `glass-sidebar`, ...); Windows: `acrylic`, `mica`, `tabbed`, `none` | macOS `none`, Windows `acrylic` | On macOS an Apple vibrancy material, where `none` uses the blur radius instead, or a Liquid Glass variant (macOS 26 or later; older macOS uses the blur radius instead). On Windows a Windows 11 backdrop; `none` turns it off and gives a solid window in Paseo's theme colour. |
 | Blur radius | 0 - 60 | 30 | macOS only: background blur behind the window, used when Material is `none`. A Liquid Glass variant on macOS older than 26 falls back to the radius last set here. Windows' materials have a fixed blur. |
-| Tint | 0 - 100% | 85% | How much of the theme colour washes over the blur. |
+| Tint | 0 - 100% | 85% | How much of the theme colour washes over the blur. Off with `none` on Windows, where nothing shows through. |
 | Main pane glass | on / off | on | Extends the glass behind chats and editors; off keeps the main pane solid. |
 
 ### Tabs

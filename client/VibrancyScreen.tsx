@@ -247,6 +247,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
   const runningVibrancyBuild = status?.runningVibrancyBuild ?? false;
   const appearanceDisabled = !settingsLoaded || !runningVibrancyBuild || busy || polling;
   const blurDisabled = appearanceDisabled || settings.material !== "none";
+  const tintDisabled = appearanceDisabled || (status?.platform === "win32" && settings.material === "none");
   const latest = status?.latest ?? null;
   const updateAvailable =
     latest !== null && status?.runningVersion != null && compareVersions(latest.version, status.runningVersion) > 0;
@@ -292,7 +293,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
             min={0}
             max={100}
             step={1}
-            disabled={appearanceDisabled}
+            disabled={tintDisabled}
             theme={theme}
             format={(pct) => `${pct}%`}
             onChange={(pct) => updateSettings({ ...settings, tint: pct / 100 })}
@@ -303,7 +304,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
             value={String(Math.round(settings.tint * 100))}
             options={TINT_STEPS.map((n) => ({ label: `${n}%`, value: String(n) }))}
             onValueChange={(v) => updateSettings({ ...settings, tint: Number(v) / 100 })}
-            disabled={appearanceDisabled}
+            disabled={tintDisabled}
           />
         )}
         <SettingsSwitch
