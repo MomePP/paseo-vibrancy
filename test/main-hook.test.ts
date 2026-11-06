@@ -462,7 +462,7 @@ test("maximize is left to Electron on both OSes", (t) => {
   for (const platform of ["darwin", "win32"] as const) {
     const { dir, watchers } = settingsDir(t);
     const sandbox = loadPvJs(dir, watchers, platform);
-    const win = makeWindow();
+    const win = Object.assign(makeWindow(), { getBounds: () => ({ x: 0, y: 0, width: 800, height: 600 }), setBounds: () => {} });
     sandbox.fireBrowserWindowCreated(win);
 
     assert.equal("maximize" in win, false, platform);

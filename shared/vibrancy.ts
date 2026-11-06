@@ -54,7 +54,7 @@ export const GLASS_MATERIALS = LIQUID_GLASS.map(([id]) => id);
 
 export const MAC_MATERIALS = [...VIBRANCY_MATERIALS, ...GLASS_MATERIALS];
 
-/** `BrowserWindow.setBackgroundMaterial` values (Windows 11 22H2+); "none" leaves the window see-through with no blur. */
+/** `BrowserWindow.setBackgroundMaterial` values (Windows 11 22H2+); "none" turns the backdrop off, which shows a plain white window. */
 export const WINDOWS_MATERIALS = ["none", "acrylic", "mica", "tabbed"] as const;
 
 export type Material = (typeof MAC_MATERIALS)[number] | (typeof WINDOWS_MATERIALS)[number];
