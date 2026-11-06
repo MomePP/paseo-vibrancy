@@ -247,7 +247,6 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
   const runningVibrancyBuild = status?.runningVibrancyBuild ?? false;
   const appearanceDisabled = !settingsLoaded || !runningVibrancyBuild || busy || polling;
   const blurDisabled = appearanceDisabled || settings.material !== "none";
-  // Windows' "none" has no backdrop, so the page is opaque and tint has nothing to show through.
   const tintDisabled = appearanceDisabled || (status?.platform === "win32" && settings.material === "none");
   const latest = status?.latest ?? null;
   const updateAvailable =
