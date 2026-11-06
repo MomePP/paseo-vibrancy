@@ -212,6 +212,22 @@ test("patchRenderer glasses the floating surfaces Paseo 0.13 writes with object 
   }
 });
 
+// Paseo 0.15 moved flexShrink/minHeight/overflow to the front of the detail
+// card and gave the list a minHeight of 46.
+const AUTOCOMPLETE_0_15 =
+  'detailCard:{flexShrink:1,minHeight:0,overflow:"hidden",backgroundColor:t.colors.surface1,borderWidth:t.borderWidth[1],borderColor:t.colors.borderAccent,borderRadius:t.borderRadius.lg,...t.shadow.md},' +
+  'container:{flexShrink:1,minHeight:46,backgroundColor:t.colors.surface1,borderWidth:t.borderWidth[1],borderColor:t.colors.borderAccent,borderRadius:t.borderRadius.lg,overflow:"hidden",...t.shadow.md}';
+
+test("patchRenderer glasses Paseo 0.15's autocomplete list and detail card", () => {
+  const { src, notes } = patchRenderer(AUTOCOMPLETE_0_15, DEFAULT_TERM);
+  for (const label of ["glass autocomplete detail card", "glass autocomplete list"]) {
+    assert.ok(notes.includes(`ok      ${label} (1x)`), label);
+  }
+  assert.equal(src.includes("colors.surface1"), false, "both surfaces lose the opaque fill");
+  assert.equal(src.match(/backdropFilter:/g)?.length, 2);
+  assert.equal(src.match(/borderWidth:0,/g)?.length, 2);
+});
+
 test("patchRenderer maps Paseo 0.13's tab chip backdrops to the glass fills", () => {
   const colors = {
     surface1: "s1",
