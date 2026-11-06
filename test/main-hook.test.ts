@@ -96,20 +96,12 @@ function settingsDir(t: { after: (fn: () => void) => void }): { dir: string; wat
   return { dir, watchers };
 }
 
-type Rect = { x: number; y: number; width: number; height: number };
-
-/** One display; `workArea` equal to `bounds` is what an auto-hide taskbar gives. */
-type Display = { bounds: Rect; workArea: Rect };
-
-const FULL_HD: Rect = { x: 0, y: 0, width: 1920, height: 1080 };
-
 // Evaluates PV_JS in a fresh vm context against a real settings directory
 // (real fs + real fs.watch) with fake electron/process.dlopen, as `platform`.
 function loadPvJs(
   userDataDir: string,
   watchers: FSWatcher[],
   platform: HostPlatform = "darwin",
-  display: Display = { bounds: FULL_HD, workArea: { ...FULL_HD, height: 1032 } },
 ): Sandbox {
   const windows: FakeWindow[] = [];
   const blurCalls: BlurCall[] = [];
@@ -136,9 +128,6 @@ function loadPvJs(
         sandbox.dialogs.push(args.at(-1) as Sandbox["dialogs"][number]);
         return Promise.resolve({ response: sandbox.dialogResponse });
       },
-    },
-    screen: {
-      getDisplayMatching: (_rect: Rect) => display,
     },
   };
 
@@ -469,95 +458,15 @@ test("Windows: file change re-applies to open windows", async (t) => {
   assert.equal(win.materialCalls.at(-1), "tabbed", `calls so far: ${JSON.stringify(win.materialCalls)}`);
 });
 
-/** A Windows window with real bounds and events, as Electron gives `pv.js`: `setBounds` moves it, events reach listeners. */
-function makeSizedWindow(bounds: Rect): FakeWindow & EventEmitter & {
-  bounds: Rect;
-  getBounds: () => Rect;
-  setBounds: (next: Rect) => void;
-  isMaximized?: () => boolean;
-  getNormalBounds?: () => Rect;
-  maximize?: () => void;
-  unmaximize?: () => void;
-  events: string[];
-} {
-  // makeWindow's own `on` only tracks "show"; the EventEmitter's takes its place.
-  const { on: _showOnly, ...base } = makeWindow();
-  const win = Object.assign(new EventEmitter(), base, {
-    bounds: { ...bounds },
-    events: [] as string[],
-    getBounds: () => ({ ...win.bounds }),
-    setBounds: (next: Rect) => {
-      win.bounds = { ...next };
-    },
-  });
-  for (const name of ["maximize", "unmaximize"]) {
-    win.on(name, () => win.events.push(name));
-  }
-  return win;
-}
-
-const NORMAL: Rect = { x: 200, y: 100, width: 1200, height: 800 };
-
-test("Windows, auto-hide taskbar: maximize leaves the bottom 2 px free so the taskbar can still slide up", (t) => {
-  const { dir, watchers } = settingsDir(t);
-  const sandbox = loadPvJs(dir, watchers, "win32", { bounds: FULL_HD, workArea: FULL_HD });
-  const win = makeSizedWindow(NORMAL);
-  sandbox.fireBrowserWindowCreated(win);
-
-  win.maximize!();
-
-  assert.deepEqual(win.bounds, { x: 0, y: 0, width: 1920, height: 1078 });
-  assert.equal(win.isMaximized!(), true);
-  assert.deepEqual(win.getNormalBounds!(), NORMAL, "Paseo saves these as the size to restore to");
-  assert.deepEqual(win.events, ["maximize"]);
-
-  win.maximize!();
-  win.unmaximize!();
-
-  assert.deepEqual(win.bounds, NORMAL);
-  assert.equal(win.isMaximized!(), false);
-  assert.deepEqual(win.events, ["maximize", "unmaximize"]);
-});
-
-test("Windows, visible taskbar: maximize fills the work area exactly", (t) => {
-  const { dir, watchers } = settingsDir(t);
-  const workArea = { ...FULL_HD, height: 1032 };
-  const sandbox = loadPvJs(dir, watchers, "win32", { bounds: FULL_HD, workArea });
-  const win = makeSizedWindow(NORMAL);
-  sandbox.fireBrowserWindowCreated(win);
-
-  win.maximize!();
-
-  assert.deepEqual(win.bounds, workArea);
-});
-
-test("Windows: dragging a maximized window by hand leaves it unmaximized", (t) => {
-  const { dir, watchers } = settingsDir(t);
-  const sandbox = loadPvJs(dir, watchers, "win32", { bounds: FULL_HD, workArea: FULL_HD });
-  const win = makeSizedWindow(NORMAL);
-  sandbox.fireBrowserWindowCreated(win);
-  win.maximize!();
-
-  win.emit("resized");
-  assert.equal(win.isMaximized!(), true, "an end-of-drag event with the maximized bounds changes nothing");
-
-  win.bounds = { x: 50, y: 40, width: 1000, height: 700 };
-  win.emit("moved");
-
-  assert.equal(win.isMaximized!(), false);
-  assert.deepEqual(win.getNormalBounds!(), { x: 50, y: 40, width: 1000, height: 700 });
-  assert.deepEqual(win.events, ["maximize", "unmaximize"]);
-});
-
 test("maximize is left to Electron on both OSes", (t) => {
   for (const platform of ["darwin", "win32"] as const) {
     const { dir, watchers } = settingsDir(t);
     const sandbox = loadPvJs(dir, watchers, platform);
-    const win = makeSizedWindow(NORMAL);
+    const win = makeWindow();
     sandbox.fireBrowserWindowCreated(win);
 
-    assert.equal(win.maximize, undefined, platform);
-    assert.equal(win.isMaximized, undefined, platform);
+    assert.equal("maximize" in win, false, platform);
+    assert.equal("isMaximized" in win, false, platform);
   }
 });
 
