@@ -212,8 +212,6 @@ test("patchRenderer glasses the floating surfaces Paseo 0.13 writes with object 
   }
 });
 
-// Paseo 0.15 moved flexShrink/minHeight/overflow to the front of the detail
-// card and gave the list a minHeight of 46.
 const AUTOCOMPLETE_0_15 =
   'detailCard:{flexShrink:1,minHeight:0,overflow:"hidden",backgroundColor:t.colors.surface1,borderWidth:t.borderWidth[1],borderColor:t.colors.borderAccent,borderRadius:t.borderRadius.lg,...t.shadow.md},' +
   'container:{flexShrink:1,minHeight:46,backgroundColor:t.colors.surface1,borderWidth:t.borderWidth[1],borderColor:t.colors.borderAccent,borderRadius:t.borderRadius.lg,overflow:"hidden",...t.shadow.md}';
