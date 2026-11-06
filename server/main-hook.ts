@@ -115,6 +115,11 @@ try {
     if (IS_WINDOWS) {
       if (win && typeof win.setBackgroundMaterial === "function") {
         win.setBackgroundMaterial(current.material);
+        // Electron resets the window to white on "none", which the page's
+        // translucent wash lets through; Paseo's own colour shows before paint.
+        if (current.material === "none") {
+          win.setBackgroundColor(electron.nativeTheme.shouldUseDarkColors ? "#181B1A" : "#ffffff");
+        }
       }
       return;
     }
@@ -143,7 +148,7 @@ try {
     return (
       "(function () {" +
       "var style = document.documentElement.style;" +
-      "style.setProperty('--paseo-tint', " + JSON.stringify(String(settings.tint)) + ");" +
+      "style.setProperty('--paseo-tint', " + JSON.stringify(String(IS_WINDOWS && settings.material === "none" ? 1 : settings.tint)) + ");" +
       "style.setProperty('--paseo-pane-bg', " +
       JSON.stringify(settings.paneGlass ? "transparent" : "var(--colors-surface1)") +
       ");" +
