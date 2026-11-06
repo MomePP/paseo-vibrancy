@@ -411,7 +411,7 @@ test("renderer: a settings file change re-applies to open windows", async (t) =>
   assert.deepEqual(rendererState(win), changed, "timed out after 2s waiting for the settings watcher to re-apply to the page");
 });
 
-test("module export is true", (t) => {
+test("macOS: the window is transparent so the material shows through", (t) => {
   const { dir, watchers } = settingsDir(t);
 
   const sandbox = loadPvJs(dir, watchers);
@@ -429,7 +429,7 @@ test("Windows: acrylic background material by default, on creation and again on 
   assert.deepEqual(win.materialCalls, ["acrylic", "acrylic"]);
   assert.deepEqual(win.vibrancyCalls, []);
   assert.equal(sandbox.dlopened, false);
-  assert.equal(sandbox.module.exports, true);
+  assert.equal(sandbox.module.exports, false, "a transparent window loses WS_THICKFRAME: no snap, edge resize or rounded corners");
 });
 
 test("Windows: a saved Windows material applies; a macOS-only one falls back to acrylic", (t) => {
@@ -549,14 +549,16 @@ test("Windows: dragging a maximized window by hand leaves it unmaximized", (t) =
   assert.deepEqual(win.events, ["maximize", "unmaximize"]);
 });
 
-test("macOS: maximize is left to Electron", (t) => {
-  const { dir, watchers } = settingsDir(t);
-  const sandbox = loadPvJs(dir, watchers, "darwin");
-  const win = makeSizedWindow(NORMAL);
-  sandbox.fireBrowserWindowCreated(win);
+test("maximize is left to Electron on both OSes", (t) => {
+  for (const platform of ["darwin", "win32"] as const) {
+    const { dir, watchers } = settingsDir(t);
+    const sandbox = loadPvJs(dir, watchers, platform);
+    const win = makeSizedWindow(NORMAL);
+    sandbox.fireBrowserWindowCreated(win);
 
-  assert.equal(win.maximize, undefined);
-  assert.equal(win.isMaximized, undefined);
+    assert.equal(win.maximize, undefined, platform);
+    assert.equal(win.isMaximized, undefined, platform);
+  }
 });
 
 const GOGO_BOARD = { deviceId: "gogo", name: "GoGo Board 7", vendorId: 0x0461, productId: 0x0020 };
