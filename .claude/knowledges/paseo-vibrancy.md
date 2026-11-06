@@ -128,7 +128,8 @@ own file, and that device's `pv.js` picks the change up.
   — 79 bytes, space-padded into the 80-byte original
   `backgroundColor: (0, window_manager_js_1.getWindowBackgroundColor)(systemTheme),`
   slot so every byte offset inside the asar stays put. `pv.js` ends with
-  `module.exports = true`, so the `require` yields `transparent: true`.
+  `module.exports = !IS_WINDOWS`, so the `require` yields `transparent: true`
+  on macOS and `false` on Windows (see the Windows "Window" row).
   `visualEffectState` rides in the same slot because Electron has no runtime
   setter for it — it only keeps a material from going flat when the window
   loses focus, read once by `setVibrancy`. A `glass-*` material:
@@ -577,8 +578,9 @@ end in an isolated instance.
 | Asar integrity | Windows Electron has no plist hash to update. The build reads the fuse wire (sentinel `dL7pKGdnNz796PbbjQWNKmHXBZaB9tsX`, version byte 1, count, one ASCII byte per fuse) out of `Paseo.exe` and refuses unless `EnableEmbeddedAsarIntegrityValidation` (index 4) is `0`. 0.12.0: `101100011`. |
 | Copy | `copyTree` through `original-fs`, so `app.asar` is copied as a file under the daemon's asar-patched fs (`test/electron-fs.test.ts` runs this under the real `Paseo.exe`). No compile or sign step; `buildPlan` drops `verify`, `compile`, `sign` on Windows. |
 | Material | `setBackgroundMaterial` (`none`, `acrylic`, `mica`, `tabbed`), default `acrylic`; needs Windows 11 22H2 (build 22621). `assertWindowsBlurSupported` refuses older builds before any download. The registry `ProductName` says "Windows 10" on Windows 11: use the build number. The client hides the blur radius row. A material from the other OS's list parses to this OS's default. |
-| Window | `frame: false`, transparent: square corners (electron#47510): Electron leaves out `WS_THICKFRAME` for transparent windows, and DWM only rounds framed ones. Electron answers `WM_NCHITTEST` with the resize codes at the edges. |
-| Maximize | Electron can't maximize a transparent window natively, so it sizes it to the work area (`IsZoomed` stays false). With an auto-hide taskbar the work area is the whole monitor, the window covers it exactly, and Windows treats it as full screen: the taskbar never slides up. `pv.js` replaces `maximize`/`unmaximize`/`isMaximized`/`getNormalBounds` on each window (Paseo's toggle, its title-bar button label and its window-state persistence all go through those) and leaves the bottom 2 px free when the work area equals the monitor. Verified: maximized rect `0,0,2560,1438`, the taskbar slides up, restore and relaunch-maximized work. |
+| Window | `frame: false` (Paseo's own option), **not transparent**. A transparent window loses `WS_THICKFRAME` (electron#47510), so up to 0.4.4 the copy had square corners, no shadow, no Aero Snap or Snap Layouts and a faked maximize. `setBackgroundMaterial` needs no transparency: measured on Paseo 0.15.2 / Electron 44.2 / build 26300, a non-transparent window shows the same Mica, Acrylic and Tabbed pixels as the transparent one, with `GWL_STYLE` `0x14C70000` (thick frame + caption), DWM corner preference 2 (rounded), a shadow, Win+Arrow and drag-to-edge snap, Win+Z flyout, double-click maximize, and no white flash on open. `setBackgroundColor("#00000000")` changed nothing, so `pv.js` doesn't call it. The renderer can't make the window opaque: the chrome-payload patch strips `backgroundColor` from `paseo:window:updateChrome`. |
+| Maximize | Native (`IsZoomed` true); the auto-hide taskbar still slides up over a maximized window. `pv.js` no longer replaces `maximize`/`isMaximized`. |
+| Known, not fixed | Material `none` shows a white window (232,233,233), as it did when transparent. A non-transparent frameless window grows a few pixels per relaunch (1484×992 → 1488×995 → 1494×1001) also with no material set, i.e. Paseo's own Windows window setup; root cause not found. |
 | Quit | `CloseMainWindow()` on the main `Paseo.exe` quits the whole tree, daemon and plugin server included, within about a second (with `keepRunningAfterQuit` false). |
 
 ### Gotchas: starting the swap script on Windows

@@ -125,7 +125,6 @@ A sidebar notice appears when a newer Paseo release exists, or when the plugin h
 - The plugin's server half downloads the matching Paseo release and verifies it. On macOS that is twice: by checksum, and by Paseo's Developer ID signature. Paseo's Windows builds are unsigned, so on Windows the only check is the SHA-256 checksum GitHub records for the release file.
 - It then patches a copy and adds a small main-process hook. On macOS it also adds a native blur module and signs the copy ad-hoc; on Windows the hook sets a Windows 11 backdrop material, and the build first checks that Paseo still loads a modified `app.asar`.
 - macOS refuses to launch a modified bundle that still carries Paseo's original signature, and on Windows the installed Paseo would undo the patches the next time it updates itself, so the copy lives separately and updates through the plugin. Paseo's own updater is switched off inside the copy.
-- On Windows the copy's window has square corners: Windows drops the rounded corners from see-through windows.
 - Every patch is matched by content. If a Paseo release moves one, the build report lists it as `MISSED` and the rest still apply.
 
 ## Files
