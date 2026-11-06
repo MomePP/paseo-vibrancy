@@ -9,7 +9,8 @@ import { GLASS_MATERIALS, MAC_MATERIALS, OPEN_FILES_IN_NEW_TAB_GLOBAL, WINDOWS_M
  * (no requires of this plugin's modules; the shared names it needs are
  * interpolated into the source below). A throw at load time would break
  * Paseo's launch, so all load-time work is wrapped in a single try/catch and
- * the `module.exports` line runs regardless of what happens inside it.
+ * the export, which the hook line passes as the window's `transparent`
+ * option, is set regardless of what happens inside it.
  */
 
 export const PV_JS = `"use strict";
@@ -266,8 +267,8 @@ try {
   console.error("[paseo-vibrancy] load-time failure, Paseo will still launch", loadErr);
 }
 
-// The export is the window's \`transparent\` option. Windows' backdrop materials
-// need no transparency, and a transparent window loses WS_THICKFRAME: snap,
-// edge resize, native maximize and rounded corners.
+// Windows' backdrop materials need no transparency, and Electron drops
+// WS_THICKFRAME from a transparent window: no snap, edge resize, native
+// maximize or rounded corners.
 module.exports = !IS_WINDOWS;
 `;
