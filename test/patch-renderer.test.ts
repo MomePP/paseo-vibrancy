@@ -212,12 +212,12 @@ test("patchRenderer glasses the floating surfaces Paseo 0.13 writes with object 
   }
 });
 
-const AUTOCOMPLETE_0_15 =
+const AUTOCOMPLETE_0_14 =
   'detailCard:{flexShrink:1,minHeight:0,overflow:"hidden",backgroundColor:t.colors.surface1,borderWidth:t.borderWidth[1],borderColor:t.colors.borderAccent,borderRadius:t.borderRadius.lg,...t.shadow.md},' +
   'container:{flexShrink:1,minHeight:46,backgroundColor:t.colors.surface1,borderWidth:t.borderWidth[1],borderColor:t.colors.borderAccent,borderRadius:t.borderRadius.lg,overflow:"hidden",...t.shadow.md}';
 
-test("patchRenderer glasses Paseo 0.15's autocomplete list and detail card", () => {
-  const { src, notes } = patchRenderer(AUTOCOMPLETE_0_15, DEFAULT_TERM);
+test("patchRenderer glasses the autocomplete list and detail card Paseo 0.14 reshaped", () => {
+  const { src, notes } = patchRenderer(AUTOCOMPLETE_0_14, DEFAULT_TERM);
   for (const label of ["glass autocomplete detail card", "glass autocomplete list"]) {
     assert.ok(notes.includes(`ok      ${label} (1x)`), label);
   }
