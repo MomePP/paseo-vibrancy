@@ -96,20 +96,12 @@ function settingsDir(t: { after: (fn: () => void) => void }): { dir: string; wat
   return { dir, watchers };
 }
 
-type Rect = { x: number; y: number; width: number; height: number };
-
-/** One display; `workArea` equal to `bounds` is what an auto-hide taskbar gives. */
-type Display = { bounds: Rect; workArea: Rect };
-
-const FULL_HD: Rect = { x: 0, y: 0, width: 1920, height: 1080 };
-
 // Evaluates PV_JS in a fresh vm context against a real settings directory
 // (real fs + real fs.watch) with fake electron/process.dlopen, as `platform`.
 function loadPvJs(
   userDataDir: string,
   watchers: FSWatcher[],
   platform: HostPlatform = "darwin",
-  display: Display = { bounds: FULL_HD, workArea: { ...FULL_HD, height: 1032 } },
 ): Sandbox {
   const windows: FakeWindow[] = [];
   const blurCalls: BlurCall[] = [];
@@ -136,9 +128,6 @@ function loadPvJs(
         sandbox.dialogs.push(args.at(-1) as Sandbox["dialogs"][number]);
         return Promise.resolve({ response: sandbox.dialogResponse });
       },
-    },
-    screen: {
-      getDisplayMatching: (_rect: Rect) => display,
     },
   };
 
@@ -411,7 +400,7 @@ test("renderer: a settings file change re-applies to open windows", async (t) =>
   assert.deepEqual(rendererState(win), changed, "timed out after 2s waiting for the settings watcher to re-apply to the page");
 });
 
-test("module export is true", (t) => {
+test("macOS: the window is transparent so the material shows through", (t) => {
   const { dir, watchers } = settingsDir(t);
 
   const sandbox = loadPvJs(dir, watchers);
@@ -429,7 +418,7 @@ test("Windows: acrylic background material by default, on creation and again on 
   assert.deepEqual(win.materialCalls, ["acrylic", "acrylic"]);
   assert.deepEqual(win.vibrancyCalls, []);
   assert.equal(sandbox.dlopened, false);
-  assert.equal(sandbox.module.exports, true);
+  assert.equal(sandbox.module.exports, false, "a transparent window loses WS_THICKFRAME: no snap, edge resize or rounded corners");
 });
 
 test("Windows: a saved Windows material applies; a macOS-only one falls back to acrylic", (t) => {
@@ -469,94 +458,16 @@ test("Windows: file change re-applies to open windows", async (t) => {
   assert.equal(win.materialCalls.at(-1), "tabbed", `calls so far: ${JSON.stringify(win.materialCalls)}`);
 });
 
-/** A Windows window with real bounds and events, as Electron gives `pv.js`: `setBounds` moves it, events reach listeners. */
-function makeSizedWindow(bounds: Rect): FakeWindow & EventEmitter & {
-  bounds: Rect;
-  getBounds: () => Rect;
-  setBounds: (next: Rect) => void;
-  isMaximized?: () => boolean;
-  getNormalBounds?: () => Rect;
-  maximize?: () => void;
-  unmaximize?: () => void;
-  events: string[];
-} {
-  // makeWindow's own `on` only tracks "show"; the EventEmitter's takes its place.
-  const { on: _showOnly, ...base } = makeWindow();
-  const win = Object.assign(new EventEmitter(), base, {
-    bounds: { ...bounds },
-    events: [] as string[],
-    getBounds: () => ({ ...win.bounds }),
-    setBounds: (next: Rect) => {
-      win.bounds = { ...next };
-    },
-  });
-  for (const name of ["maximize", "unmaximize"]) {
-    win.on(name, () => win.events.push(name));
+test("maximize is left to Electron on both OSes", (t) => {
+  for (const platform of ["darwin", "win32"] as const) {
+    const { dir, watchers } = settingsDir(t);
+    const sandbox = loadPvJs(dir, watchers, platform);
+    const win = Object.assign(makeWindow(), { getBounds: () => ({ x: 0, y: 0, width: 800, height: 600 }), setBounds: () => {} });
+    sandbox.fireBrowserWindowCreated(win);
+
+    assert.equal("maximize" in win, false, platform);
+    assert.equal("isMaximized" in win, false, platform);
   }
-  return win;
-}
-
-const NORMAL: Rect = { x: 200, y: 100, width: 1200, height: 800 };
-
-test("Windows, auto-hide taskbar: maximize leaves the bottom 2 px free so the taskbar can still slide up", (t) => {
-  const { dir, watchers } = settingsDir(t);
-  const sandbox = loadPvJs(dir, watchers, "win32", { bounds: FULL_HD, workArea: FULL_HD });
-  const win = makeSizedWindow(NORMAL);
-  sandbox.fireBrowserWindowCreated(win);
-
-  win.maximize!();
-
-  assert.deepEqual(win.bounds, { x: 0, y: 0, width: 1920, height: 1078 });
-  assert.equal(win.isMaximized!(), true);
-  assert.deepEqual(win.getNormalBounds!(), NORMAL, "Paseo saves these as the size to restore to");
-  assert.deepEqual(win.events, ["maximize"]);
-
-  win.maximize!();
-  win.unmaximize!();
-
-  assert.deepEqual(win.bounds, NORMAL);
-  assert.equal(win.isMaximized!(), false);
-  assert.deepEqual(win.events, ["maximize", "unmaximize"]);
-});
-
-test("Windows, visible taskbar: maximize fills the work area exactly", (t) => {
-  const { dir, watchers } = settingsDir(t);
-  const workArea = { ...FULL_HD, height: 1032 };
-  const sandbox = loadPvJs(dir, watchers, "win32", { bounds: FULL_HD, workArea });
-  const win = makeSizedWindow(NORMAL);
-  sandbox.fireBrowserWindowCreated(win);
-
-  win.maximize!();
-
-  assert.deepEqual(win.bounds, workArea);
-});
-
-test("Windows: dragging a maximized window by hand leaves it unmaximized", (t) => {
-  const { dir, watchers } = settingsDir(t);
-  const sandbox = loadPvJs(dir, watchers, "win32", { bounds: FULL_HD, workArea: FULL_HD });
-  const win = makeSizedWindow(NORMAL);
-  sandbox.fireBrowserWindowCreated(win);
-  win.maximize!();
-
-  win.emit("resized");
-  assert.equal(win.isMaximized!(), true, "an end-of-drag event with the maximized bounds changes nothing");
-
-  win.bounds = { x: 50, y: 40, width: 1000, height: 700 };
-  win.emit("moved");
-
-  assert.equal(win.isMaximized!(), false);
-  assert.deepEqual(win.getNormalBounds!(), { x: 50, y: 40, width: 1000, height: 700 });
-  assert.deepEqual(win.events, ["maximize", "unmaximize"]);
-});
-
-test("macOS: maximize is left to Electron", (t) => {
-  const { dir, watchers } = settingsDir(t);
-  const sandbox = loadPvJs(dir, watchers, "darwin");
-  const win = makeSizedWindow(NORMAL);
-  sandbox.fireBrowserWindowCreated(win);
-
-  assert.equal(win.maximize, undefined);
-  assert.equal(win.isMaximized, undefined);
 });
 
 const GOGO_BOARD = { deviceId: "gogo", name: "GoGo Board 7", vendorId: 0x0461, productId: 0x0020 };
