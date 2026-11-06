@@ -490,14 +490,14 @@ export const GLASS_SURFACES: ExpectedReTableEntry[] = [
   },
   {
     label: "glass autocomplete detail card",
-    pattern: /(detailCard:(?:Object\.assign\()?\{backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1,borderWidth:[A-Za-z_$][\w$]*\.borderWidth\[1\]/g,
+    pattern: /(detailCard:(?:Object\.assign\()?\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1,borderWidth:[A-Za-z_$][\w$]*\.borderWidth\[1\]/g,
     replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${GLASS_BLUR}",borderWidth:0`,
     expect: 1,
   },
   {
     label: "glass autocomplete list",
     pattern:
-      /(container:(?:Object\.assign\()?\{flexShrink:1,minHeight:0,backgroundColor:)([A-Za-z_$][\w$]*)\.colors\.surface1,borderWidth:\2\.borderWidth\[1\](,borderColor:\2\.colors\.borderAccent,borderRadius:\2\.borderRadius\.lg,overflow:"hidden")/g,
+      /(container:(?:Object\.assign\()?\{flexShrink:1,minHeight:\d+,backgroundColor:)([A-Za-z_$][\w$]*)\.colors\.surface1,borderWidth:\2\.borderWidth\[1\](,borderColor:\2\.colors\.borderAccent,borderRadius:\2\.borderRadius\.lg,overflow:"hidden")/g,
     replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${GLASS_BLUR}",borderWidth:0$3`,
     expect: 1,
   },
