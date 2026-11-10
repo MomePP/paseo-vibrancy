@@ -154,7 +154,7 @@ export const KEBAB_GUTTER: ExpectedReTableEntry = {
 export const ARCHIVE_HIDES_STAT: ExpectedReTableEntry = {
   label: "archive button hides diff stat",
   pattern:
-    /([\w$]+)&&\(([\w$]+)=([\w$]+)\?"hidden":"visible"\);return\{trailingPresentation:\2,showKebab:([\w$]+),showArchiveButton:([^,]+),/g,
+    /([\w$]+)&&\(([\w$]+)=([\w$]+)\?"hidden":"visible"\);return\{trailingPresentation:\2,showKebab:([\w$]+),showArchiveButton:([^,(){}]+),/g,
   replacement: '$1&&($2=$3||($5)?"hidden":"visible");return{trailingPresentation:$2,showKebab:$4,showArchiveButton:$5,',
   expect: 1,
   requires: "showArchiveButton:",
