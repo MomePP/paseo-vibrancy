@@ -545,6 +545,18 @@ update completing).
   `minHeight` from 0 to 46, so both patches missed from 0.14.0 on. The
   anchors take `\{[^{}]*?backgroundColor:` and `minHeight:\d+`, so the same
   entries match 0.13 and 0.15.2; a 0.15.2 build reports no `MISSED`.
+- **Paseo 0.16 removed the autocomplete detail card and added a sidebar
+  archive button** (upstream #8905 and #8904; seen on 0.16.0-beta.1). A
+  table entry with `requires: "<marker>"` is skipped with an `absent` note
+  when the bundle lacks the marker, so one table serves versions with and
+  without a surface: the detail card requires `detailCard:`, the archive
+  patch `showArchiveButton:`. A hovered row's archive button sits left of
+  the kebab, over the diff stat. Stock fades the stat under the trailing
+  scrim, which is transparent here, so `ARCHIVE_HIDES_STAT` turns
+  `resolveTrailingActionVisibility`'s `trailingPresentation` to `hidden`
+  (opacity 0, no reflow) whenever `showArchiveButton` is true. Verified in an
+  isolated 0.16.0-beta.1 copy over CDP: on a hovered row the stat's opacity
+  is 0 while the archive button shows.
 - **The client's SDK imports must exist on the oldest supported host.** The
   plugin client runs against the host Paseo's own SDK modules. SDK 0.13
   deprecates `@getpaseo/plugin/client/react-native` for `client/ui`, but

@@ -226,6 +226,46 @@ test("patchRenderer glasses the autocomplete list and detail card Paseo 0.14 res
   assert.equal(src.match(/borderWidth:0,/g)?.length, 2);
 });
 
+test("patchRenderer notes the detail card Paseo 0.16 removed as absent, not MISSED", () => {
+  const autocomplete016 = AUTOCOMPLETE_0_14.slice(AUTOCOMPLETE_0_14.indexOf("container:"));
+  const { notes } = patchRenderer(autocomplete016, DEFAULT_TERM);
+  assert.ok(notes.includes("absent  glass autocomplete detail card: not in this Paseo"));
+  assert.ok(notes.includes("ok      glass autocomplete list (1x)"));
+  assert.ok(!notes.some((n) => n.startsWith("MISSED  glass autocomplete")));
+});
+
+const RESOLVER_0_15 =
+  'function({workspace:t,trailing:o,hasArchiveAction:n,isHovered:s,isTouchPlatform:c,showShortcut:l}){const u=(0,w.hasSidebarWorkspaceTrailing)({workspace:t,trailing:o}),p=Boolean(n&&(s||c))&&!l,h=u&&!(n&&c);let S="absent";h&&(S=l?"hidden":"visible");return{trailingPresentation:S,showKebab:p,showScrim:p&&s,renderSlot:n||u,reserveSlotWidth:h||n&&c}}';
+const RESOLVER_0_16 = RESOLVER_0_15.replace("showKebab:p,", "showKebab:p,showArchiveButton:p&&s&&!c,");
+
+type Resolver = (input: { isHovered: boolean; isTouchPlatform: boolean; showShortcut: boolean }) => {
+  trailingPresentation: string;
+  showArchiveButton: boolean;
+};
+
+function patchedResolver(src: string): Resolver {
+  const fn = src.slice(src.indexOf("function({workspace"));
+  const resolve = new Function("w", `return ${fn}`)({ hasSidebarWorkspaceTrailing: () => true });
+  return (input) => resolve({ workspace: {}, trailing: {}, hasArchiveAction: true, ...input });
+}
+
+test("patchRenderer hides a sidebar row's diff stat while Paseo 0.16's archive button covers it", () => {
+  const { src, notes } = patchRenderer(RESOLVER_0_16, DEFAULT_TERM);
+  assert.ok(notes.includes("ok      archive button hides diff stat (1x)"));
+  const resolve = patchedResolver(src);
+  const hovered = resolve({ isHovered: true, isTouchPlatform: false, showShortcut: false });
+  assert.equal(hovered.showArchiveButton, true);
+  assert.equal(hovered.trailingPresentation, "hidden");
+  assert.equal(resolve({ isHovered: false, isTouchPlatform: false, showShortcut: false }).trailingPresentation, "visible");
+  assert.equal(resolve({ isHovered: false, isTouchPlatform: false, showShortcut: true }).trailingPresentation, "hidden");
+});
+
+test("patchRenderer notes the archive button as absent on a Paseo without one", () => {
+  const { src, notes } = patchRenderer(RESOLVER_0_15, DEFAULT_TERM);
+  assert.ok(notes.includes("absent  archive button hides diff stat: not in this Paseo"));
+  assert.ok(src.endsWith(RESOLVER_0_15));
+});
+
 test("patchRenderer maps Paseo 0.13's tab chip backdrops to the glass fills", () => {
   const colors = {
     surface1: "s1",

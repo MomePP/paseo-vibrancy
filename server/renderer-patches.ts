@@ -17,7 +17,11 @@ type TableReplacer = string | ((...match: string[]) => string);
 
 export type RendererPatch = { label: string; old: string; replacement: string; expect: number };
 export type ReTableEntry = { label: string; pattern: RegExp; replacement: TableReplacer };
-export type ExpectedReTableEntry = ReTableEntry & { expect: number };
+export type ExpectedReTableEntry = ReTableEntry & {
+  expect: number;
+  /** Text present only in Paseo builds that have the patched surface; without it the patch is noted `absent`, not MISSED. */
+  requires?: string;
+};
 
 // --- the look (fixed) -------------------------------------------------------
 //
@@ -140,6 +144,20 @@ export const KEBAB_GUTTER: ExpectedReTableEntry = {
     /(trailingActionSlot(?:Reserved)?):\{position:"relative",(minWidth:18,)?minHeight:20,flexShrink:0,alignItems:"flex-end",justifyContent:"flex-start"\}/g,
   replacement: `$1:{position:"relative",$2minHeight:20,flexShrink:0,alignItems:"flex-end",justifyContent:"flex-start",paddingRight:${KEBAB_GUTTER_PX}}`,
   expect: 2,
+};
+
+// Paseo 0.16 draws an archive button left of the kebab on a hovered row,
+// over the diff stat. Stock fades the stat under the trailing scrim, which
+// is transparent here (SCRIM_COLOURS), so the stat goes "hidden" while the
+// button shows, as stock already does for the shortcut badge. Opacity
+// only: nothing reflows on hover.
+export const ARCHIVE_HIDES_STAT: ExpectedReTableEntry = {
+  label: "archive button hides diff stat",
+  pattern:
+    /([\w$]+)&&\(([\w$]+)=([\w$]+)\?"hidden":"visible"\);return\{trailingPresentation:\2,showKebab:([\w$]+),showArchiveButton:([^,(){}]+),/g,
+  replacement: '$1&&($2=$3||($5)?"hidden":"visible");return{trailingPresentation:$2,showKebab:$4,showArchiveButton:$5,',
+  expect: 1,
+  requires: "showArchiveButton:",
 };
 
 // Floating surfaces (menus, dialogs, comboboxes, hover cards, tooltips,
@@ -493,6 +511,7 @@ export const GLASS_SURFACES: ExpectedReTableEntry[] = [
     pattern: /(detailCard:(?:Object\.assign\()?\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1,borderWidth:[A-Za-z_$][\w$]*\.borderWidth\[1\]/g,
     replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${GLASS_BLUR}",borderWidth:0`,
     expect: 1,
+    requires: "detailCard:",
   },
   {
     label: "glass autocomplete list",
@@ -675,6 +694,7 @@ export const BUILD_TABLES = {
   KEBAB_GUTTER_PX,
   KEBAB_GUTTER,
   LABELS_LINE,
+  ARCHIVE_HIDES_STAT,
   TAB_FILLS,
   TAB_GLASS,
   HANDLE_HIGHLIGHT_TOKEN,
