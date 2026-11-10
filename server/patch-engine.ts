@@ -79,6 +79,15 @@ export class Patcher {
     this.replaceRe(label, variant.pattern, variant.replacement, expect);
   }
 
+  /** True, with an `absent` note, when the bundle lacks `marker`: the surface `label` patches does not exist in this Paseo. */
+  absent(label: string, marker: string | undefined): boolean {
+    if (marker === undefined || this.src.includes(marker)) {
+      return false;
+    }
+    this.notes.push(`absent  ${label}: not in this Paseo`);
+    return true;
+  }
+
   sweepRe(label: string, re: RegExp, neu: Replacer): void {
     const global = re.global ? re : new RegExp(re.source, `${re.flags}g`);
     const hits = [...this.src.matchAll(global)].length;

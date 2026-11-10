@@ -14,6 +14,7 @@ import { resourcesDir } from "./layout.ts";
 import { Patcher } from "./patch-engine.ts";
 import {
   ALPHA_HELPER,
+  ARCHIVE_HIDES_STAT,
   BACKDROP_MASKS,
   DIFF_PALETTE,
   FRAME_RATE,
@@ -133,8 +134,10 @@ export function patchRenderer(src: string, term: TermMetrics): { src: string; no
   for (const { label, pattern, replacement, expect } of DIFF_PALETTE) {
     patcher.replaceRe(label, pattern, replacement, expect);
   }
-  for (const { label, pattern, replacement, expect } of GLASS_SURFACES) {
-    patcher.replaceRe(label, pattern, replacement, expect);
+  for (const { label, pattern, replacement, expect, requires } of GLASS_SURFACES) {
+    if (!patcher.absent(label, requires)) {
+      patcher.replaceRe(label, pattern, replacement, expect);
+    }
   }
   for (const { label, pattern, replacement } of FRAME_RATE) {
     patcher.replaceRe(label, pattern, replacement, 1);
@@ -146,6 +149,14 @@ export function patchRenderer(src: string, term: TermMetrics): { src: string; no
   patcher.replaceRe(SCRIM_COLOURS.label, SCRIM_COLOURS.pattern, SCRIM_COLOURS.replacement, SCRIM_COLOURS.expect);
   patcher.sweepRe(KEBAB_CHIP.label, KEBAB_CHIP.pattern, KEBAB_CHIP.replacement);
   patcher.replaceRe(KEBAB_GUTTER.label, KEBAB_GUTTER.pattern, KEBAB_GUTTER.replacement, KEBAB_GUTTER.expect);
+  if (!patcher.absent(ARCHIVE_HIDES_STAT.label, ARCHIVE_HIDES_STAT.requires)) {
+    patcher.replaceRe(
+      ARCHIVE_HIDES_STAT.label,
+      ARCHIVE_HIDES_STAT.pattern,
+      ARCHIVE_HIDES_STAT.replacement,
+      ARCHIVE_HIDES_STAT.expect,
+    );
+  }
   patcher.replaceRe(LABELS_LINE.label, LABELS_LINE.pattern, LABELS_LINE.replacement, LABELS_LINE.expect);
   patcher.replaceReFirst(TAB_FILLS.label, TAB_FILLS.variants, TAB_FILLS.expect);
   for (const { label, pattern, replacement, expect } of TAB_GLASS) {
