@@ -238,12 +238,12 @@ const RESOLVER_0_15 =
   'function({workspace:t,trailing:o,hasArchiveAction:n,isHovered:s,isTouchPlatform:c,showShortcut:l}){const u=(0,w.hasSidebarWorkspaceTrailing)({workspace:t,trailing:o}),p=Boolean(n&&(s||c))&&!l,h=u&&!(n&&c);let S="absent";h&&(S=l?"hidden":"visible");return{trailingPresentation:S,showKebab:p,showScrim:p&&s,renderSlot:n||u,reserveSlotWidth:h||n&&c}}';
 const RESOLVER_0_16 = RESOLVER_0_15.replace("showKebab:p,", "showKebab:p,showArchiveButton:p&&s&&!c,");
 
-type Presentation = (input: { isHovered: boolean; isTouchPlatform: boolean; showShortcut: boolean }) => {
+type Resolver = (input: { isHovered: boolean; isTouchPlatform: boolean; showShortcut: boolean }) => {
   trailingPresentation: string;
   showArchiveButton: boolean;
 };
 
-function patchedResolver(src: string): Presentation {
+function patchedResolver(src: string): Resolver {
   const fn = src.slice(src.indexOf("function({workspace"));
   const resolve = new Function("w", `return ${fn}`)({ hasSidebarWorkspaceTrailing: () => true });
   return (input) => resolve({ workspace: {}, trailing: {}, hasArchiveAction: true, ...input });
