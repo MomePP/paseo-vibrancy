@@ -555,8 +555,8 @@ update completing).
   scrim, which is transparent here, so `ARCHIVE_HIDES_STAT` turns
   `resolveTrailingActionVisibility`'s `trailingPresentation` to `hidden`
   (opacity 0, no reflow) whenever `showArchiveButton` is true. Verified in an
-  isolated 0.16.0-beta.1 copy over CDP: hovered, the stat's opacity is 0 and
-  the archive button (x 262-280) no longer overlaps it (x 246-262).
+  isolated 0.16.0-beta.1 copy over CDP: on a hovered row the stat's opacity
+  is 0 while the archive button shows.
 - **The client's SDK imports must exist on the oldest supported host.** The
   plugin client runs against the host Paseo's own SDK modules. SDK 0.13
   deprecates `@getpaseo/plugin/client/react-native` for `client/ui`, but

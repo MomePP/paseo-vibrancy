@@ -17,10 +17,11 @@ type TableReplacer = string | ((...match: string[]) => string);
 
 export type RendererPatch = { label: string; old: string; replacement: string; expect: number };
 export type ReTableEntry = { label: string; pattern: RegExp; replacement: TableReplacer };
-// `requires`: a marker of the surface the patch targets. A bundle without it
-// is a Paseo that never had, or no longer has, that surface: the patch is
-// noted `absent`, not MISSED.
-export type ExpectedReTableEntry = ReTableEntry & { expect: number; requires?: string };
+export type ExpectedReTableEntry = ReTableEntry & {
+  expect: number;
+  /** Text present only in Paseo builds that have the patched surface; without it the patch is noted `absent`, not MISSED. */
+  requires?: string;
+};
 
 // --- the look (fixed) -------------------------------------------------------
 //
@@ -145,11 +146,11 @@ export const KEBAB_GUTTER: ExpectedReTableEntry = {
   expect: 2,
 };
 
-// Paseo 0.16 shows an archive button left of the kebab on a hovered row,
-// over the diff stat. Stock fades the stat out under the trailing scrim,
-// which is transparent here (SCRIM_COLOURS), so the stat is hidden while the
-// button shows instead, the way stock already hides it for the shortcut
-// badge. Opacity only: nothing reflows on hover.
+// Paseo 0.16 draws an archive button left of the kebab on a hovered row,
+// over the diff stat. Stock fades the stat under the trailing scrim, which
+// is transparent here (SCRIM_COLOURS), so the stat goes "hidden" while the
+// button shows, as stock already does for the shortcut badge. Opacity
+// only: nothing reflows on hover.
 export const ARCHIVE_HIDES_STAT: ExpectedReTableEntry = {
   label: "archive button hides diff stat",
   pattern:

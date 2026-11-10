@@ -55,7 +55,12 @@ export class Patcher {
     this.notes.push(`ok      ${label} (${hits}x)`);
   }
 
-  replaceRe(label: string, re: RegExp, neu: Replacer, expect: number): void {
+  /** With `requires` given and missing from the bundle, notes `label` as `absent` and patches nothing. */
+  replaceRe(label: string, re: RegExp, neu: Replacer, expect: number, requires?: string): void {
+    if (requires !== undefined && !this.src.includes(requires)) {
+      this.notes.push(`absent  ${label}: not in this Paseo`);
+      return;
+    }
     const global = re.global ? re : new RegExp(re.source, `${re.flags}g`);
     const hits = [...this.src.matchAll(global)].length;
     if (hits === 0) {
@@ -77,15 +82,6 @@ export class Patcher {
       return;
     }
     this.replaceRe(label, variant.pattern, variant.replacement, expect);
-  }
-
-  /** True, with an `absent` note, when the bundle lacks `marker`: the surface `label` patches does not exist in this Paseo. */
-  absent(label: string, marker: string | undefined): boolean {
-    if (marker === undefined || this.src.includes(marker)) {
-      return false;
-    }
-    this.notes.push(`absent  ${label}: not in this Paseo`);
-    return true;
   }
 
   sweepRe(label: string, re: RegExp, neu: Replacer): void {
