@@ -426,14 +426,14 @@ export const STOCK_ANSI: ExpectedReTableEntry = {
   expect: 1,
 };
 
-// Paseo draws diffs onto a <canvas>, but clears each painted region before
-// filling it (0.11.x and 0.12), so the canvas can be glass: its `surface`,
-// `headerSurface` and `emptyBackground` all read the already-transparent
-// `surface0`, and need no patch. Added and removed lines keep their own
-// translucent tints. The header of the file under the pointer (stock opaque
-// `surface1`) takes the hover glass. The sticky file header is a separate
-// canvas over the scrolling one; FLOATING_SURFACES_CSS gives that canvas the
-// floating-surface fill and blur so code scrolling under it stays unreadable.
+// Paseo draws diffs onto a <canvas> and clears each painted region before
+// filling it, so the canvas can be glass: its `surface`, `headerSurface` and
+// `emptyBackground` all read the already-transparent `surface0`, and need no
+// patch. Added and removed lines keep their own translucent tints. The header
+// of the file under the pointer (stock opaque `surface1`) takes the hover
+// glass. The sticky file header is a separate canvas over the scrolling one;
+// FLOATING_SURFACES_CSS gives that canvas the floating-surface fill and blur
+// so code scrolling under it stays unreadable.
 export const DIFF_PALETTE: ExpectedReTableEntry[] = [
   {
     label: "glass diff active header",
@@ -442,6 +442,19 @@ export const DIFF_PALETTE: ExpectedReTableEntry[] = [
     expect: 1,
   },
 ];
+
+// On scroll the diff canvas keeps the rows still in view: it copies itself to
+// a scratch canvas and draws the rows back shifted, with the default
+// source-over. Opaque rows hide what was there; transparent ones stack on the
+// old rows, so every scroll left ghost text. The canvas is cleared first.
+export const DIFF_SCROLL_CLEAR: ExpectedReTableEntry = {
+  label: "clear diff canvas before scroll",
+  pattern:
+    /(globalCompositeOperation="copy",[\w$]+\.drawImage\(([\w$]+)\.canvas,0,0\),\2\.context\.setTransform\(1,0,0,1,0,0\),)(?=[\w$]+>0\?\(\2\.context\.drawImage\(\2\.scratch,)/g,
+  replacement: "$1$2.context.clearRect(0,0,$2.pixelWidth,$2.pixelHeight),",
+  expect: 1,
+  requires: '.scratch.getContext("2d")',
+};
 
 // Surfaces with no ARIA role or test id, reachable only at the style object:
 // the browser pane's "Annotate element" card, the toast pill, the user's
@@ -706,6 +719,7 @@ export const BUILD_TABLES = {
   OXOCARBON_ANSI,
   STOCK_ANSI,
   DIFF_PALETTE,
+  DIFF_SCROLL_CLEAR,
   GLASS_SURFACES,
   RING_STEPS,
   RING_SLOWDOWN,

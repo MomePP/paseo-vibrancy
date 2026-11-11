@@ -17,6 +17,7 @@ import {
   ARCHIVE_HIDES_STAT,
   BACKDROP_MASKS,
   DIFF_PALETTE,
+  DIFF_SCROLL_CLEAR,
   FRAME_RATE,
   FILE_TAB_REUSE,
   FLOATING_SURFACES_CSS,
@@ -134,6 +135,13 @@ export function patchRenderer(src: string, term: TermMetrics): { src: string; no
   for (const { label, pattern, replacement, expect } of DIFF_PALETTE) {
     patcher.replaceRe(label, pattern, replacement, expect);
   }
+  patcher.replaceRe(
+    DIFF_SCROLL_CLEAR.label,
+    DIFF_SCROLL_CLEAR.pattern,
+    DIFF_SCROLL_CLEAR.replacement,
+    DIFF_SCROLL_CLEAR.expect,
+    DIFF_SCROLL_CLEAR.requires,
+  );
   for (const { label, pattern, replacement, expect, requires } of GLASS_SURFACES) {
     patcher.replaceRe(label, pattern, replacement, expect, requires);
   }
