@@ -426,14 +426,14 @@ export const STOCK_ANSI: ExpectedReTableEntry = {
   expect: 1,
 };
 
-// Paseo draws diffs onto a <canvas> and clears each painted region before
-// filling it, so the canvas can be glass: its `surface`, `headerSurface` and
-// `emptyBackground` all read the already-transparent `surface0`, and need no
-// patch. Added and removed lines keep their own translucent tints. The header
-// of the file under the pointer (stock opaque `surface1`) takes the hover
-// glass. The sticky file header is a separate canvas over the scrolling one;
-// FLOATING_SURFACES_CSS gives that canvas the floating-surface fill and blur
-// so code scrolling under it stays unreadable.
+// Paseo draws diffs onto a <canvas>, but clears each painted region before
+// filling it (0.11.x and 0.12), so the canvas can be glass: its `surface`,
+// `headerSurface` and `emptyBackground` all read the already-transparent
+// `surface0`, and need no patch. Added and removed lines keep their own
+// translucent tints. The header of the file under the pointer (stock opaque
+// `surface1`) takes the hover glass. The sticky file header is a separate
+// canvas over the scrolling one; FLOATING_SURFACES_CSS gives that canvas the
+// floating-surface fill and blur so code scrolling under it stays unreadable.
 export const DIFF_PALETTE: ExpectedReTableEntry[] = [
   {
     label: "glass diff active header",
