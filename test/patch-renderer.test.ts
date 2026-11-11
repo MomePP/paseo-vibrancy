@@ -266,6 +266,49 @@ test("patchRenderer notes the archive button as absent on a Paseo without one", 
   assert.ok(src.endsWith(RESOLVER_0_15));
 });
 
+// Paseo 0.16.0-beta.1's diff canvas scroll: it copies the canvas to a scratch
+// canvas, then draws the kept rows back shifted by the scroll distance.
+const DIFF_SCROLL_BLIT_0_16 =
+  'function I(t){const n=t.nextTop-t.currentTop;if(!t.canReuse||0===n||Math.abs(n)>=t.canvasHeight)return{paintTop:0,paintHeight:t.canvasHeight};const o=Math.round(Math.abs(n)*t.ratio),l=t.pixelHeight-o;t.scratch.width!==t.pixelWidth&&(t.scratch.width=t.pixelWidth),t.scratch.height!==t.pixelHeight&&(t.scratch.height=t.pixelHeight);const s=t.scratch.getContext("2d");return s?(s.setTransform(1,0,0,1,0,0),s.globalCompositeOperation="copy",s.drawImage(t.canvas,0,0),t.context.setTransform(1,0,0,1,0,0),n>0?(t.context.drawImage(t.scratch,0,o,t.pixelWidth,l,0,0,t.pixelWidth,l),{paintTop:t.canvasHeight-Math.abs(n),paintHeight:Math.abs(n)}):(t.context.drawImage(t.scratch,0,0,t.pixelWidth,l,0,o,t.pixelWidth,l),{paintTop:0,paintHeight:Math.abs(n)})):{paintTop:0,paintHeight:t.canvasHeight}}';
+
+function scrollDiffCanvas(src: string, nextTop: number): string[] {
+  const blit = new Function(`return ${src.slice(src.indexOf("function I("))}`)();
+  const calls: string[] = [];
+  const context = {
+    setTransform: () => {},
+    clearRect: (...a: number[]) => calls.push(`clearRect ${a.join(",")}`),
+    drawImage: (source: unknown) => calls.push(source === scratch ? "drawImage scratch" : "drawImage other"),
+  };
+  const scratchContext = { setTransform: () => {}, globalCompositeOperation: "", drawImage: () => {} };
+  const scratch = { width: 0, height: 0, getContext: () => scratchContext };
+  blit({
+    canvas: {},
+    context,
+    scratch,
+    canReuse: true,
+    currentTop: 500,
+    nextTop,
+    canvasHeight: 300,
+    pixelWidth: 200,
+    pixelHeight: 600,
+    ratio: 2,
+  });
+  return calls;
+}
+
+test("patchRenderer clears the diff canvas before drawing its scrolled rows back, so transparent rows don't stack", () => {
+  const { src, notes } = patchRenderer(DIFF_SCROLL_BLIT_0_16, DEFAULT_TERM);
+  assert.ok(notes.includes("ok      clear diff canvas before scroll (1x)"));
+  for (const nextTop of [540, 460]) {
+    assert.deepEqual(scrollDiffCanvas(src, nextTop), ["clearRect 0,0,200,600", "drawImage scratch"], `nextTop ${nextTop}`);
+  }
+});
+
+test("patchRenderer notes the diff scroll as absent on a Paseo whose diff canvas never scrolls its pixels", () => {
+  const { notes } = patchRenderer("headerActiveSurface:e.colors.surface1,", DEFAULT_TERM);
+  assert.ok(notes.includes("absent  clear diff canvas before scroll: not in this Paseo"));
+});
+
 test("patchRenderer maps Paseo 0.13's tab chip backdrops to the glass fills", () => {
   const colors = {
     surface1: "s1",
