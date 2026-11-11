@@ -443,6 +443,19 @@ export const DIFF_PALETTE: ExpectedReTableEntry[] = [
   },
 ];
 
+// On scroll the diff canvas keeps the rows still in view: it copies itself to
+// a scratch canvas and draws the rows back shifted, with the default
+// source-over. Opaque rows hide what was there; transparent ones stack on the
+// old rows, so every scroll left ghost text. The canvas is cleared first.
+export const DIFF_SCROLL_CLEAR: ExpectedReTableEntry = {
+  label: "clear diff canvas before scroll",
+  pattern:
+    /(globalCompositeOperation="copy",[\w$]+\.drawImage\(([\w$]+)\.canvas,0,0\),\2\.context\.setTransform\(1,0,0,1,0,0\),)(?=[\w$]+>0\?\(\2\.context\.drawImage\(\2\.scratch,)/g,
+  replacement: "$1$2.context.clearRect(0,0,$2.pixelWidth,$2.pixelHeight),",
+  expect: 1,
+  requires: '.scratch.getContext("2d")',
+};
+
 // Surfaces with no ARIA role or test id, reachable only at the style object:
 // the browser pane's "Annotate element" card, the toast pill, the user's
 // message bubble (stock `surface3`, a solid slab), the composer box (stock
@@ -706,6 +719,7 @@ export const BUILD_TABLES = {
   OXOCARBON_ANSI,
   STOCK_ANSI,
   DIFF_PALETTE,
+  DIFF_SCROLL_CLEAR,
   GLASS_SURFACES,
   RING_STEPS,
   RING_SLOWDOWN,

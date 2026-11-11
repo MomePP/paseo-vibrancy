@@ -269,7 +269,7 @@ version being built (`cachedPristine`).
    `renderer-patches.ts`): every renderer patch, with its own anchors,
    occurrence counts, and `ok`/`MISSED`/sweep semantics — alpha helper,
    surface alphas, window chrome payload, terminal metrics + sync, diff
-   palette, overlay surfaces (annotate card, toast pill), frame-rate
+   palette, diff scroll clear, overlay surfaces (annotate card, toast pill), frame-rate
    stepping, readable surface0 foregrounds, hover fills, backdrop masks,
    trailing scrim, kebab chip/gutter, resize handle, file tab reuse guard
    (`"file"===…nextTarget.kind&&!globalThis.__paseoOpenFilesInNewTab&&…`),
@@ -557,6 +557,17 @@ update completing).
   (opacity 0, no reflow) whenever `showArchiveButton` is true. Verified in an
   isolated 0.16.0-beta.1 copy over CDP: on a hovered row the stat's opacity
   is 0 while the archive button shows.
+- **The diff canvas scrolls by drawing itself back shifted.** Its canvas is
+  three viewports tall and moves when the scroll nears an edge. To keep the
+  rows still in view it copies itself to a scratch canvas (`"copy"`) and
+  draws them back shifted on its own context, which is still `source-over`;
+  only the exposed strip is repainted. Opaque rows hide the old pixels. Glass
+  rows stack on them, so long diffs showed overlapping ghost text after
+  scrolling. `DIFF_SCROLL_CLEAR` clears the canvas before that draw. The
+  scroll code is byte-identical in stock 0.13.0 and 0.16.0-beta.1. Verified
+  in an isolated 0.16.0-beta.1 copy over CDP: after scrolling a 2000-line
+  diff in 80 px steps, the 0.5.1 build's rows overlap and the patched build's
+  screenshot matches one taken with the canvas cleared by hand at runtime.
 - **The client's SDK imports must exist on the oldest supported host.** The
   plugin client runs against the host Paseo's own SDK modules. SDK 0.13
   deprecates `@getpaseo/plugin/client/react-native` for `client/ui`, but
