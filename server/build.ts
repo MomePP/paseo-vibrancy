@@ -24,7 +24,7 @@ import { fs, fsp } from "./fs.ts";
 import { resolveTerm } from "./ghostty.ts";
 import { readSettings } from "./settings-file.ts";
 import type { TermMetrics } from "./ghostty.ts";
-import { WINDOWS_EXE, appVersion, localAppData, resourcesDir } from "./layout.ts";
+import { WINDOWS_EXE, appVersion, bundleIdentifier, localAppData, resourcesDir } from "./layout.ts";
 import { PV_JS } from "./main-hook.ts";
 import { patchIndexHtml, patchRenderer, rendererPath } from "./patch-renderer.ts";
 import { BUILD_TABLES } from "./renderer-patches.ts";
@@ -43,9 +43,11 @@ export const STAMP_NAME = ".vibrancy-build";
 
 // electron-updater reads this from the bundle. Pointing it at an address that
 // cannot resolve turns the update check into a logged failure instead of a
-// download that would overwrite the patches — and, on macOS, would be
-// rejected against the ad-hoc signature anyway. Rebuilding happens from the
-// paseo-vibrancy plugin's settings screen, not a standalone script.
+// download that would overwrite the patches. Nothing else stops one on macOS:
+// Squirrel.Mac only checks an update against the running copy's designated
+// requirement, and `DESIGNATED_REQUIREMENT` names just the bundle id, which
+// a Developer ID-signed stock Paseo update satisfies. Rebuilding happens from
+// the paseo-vibrancy plugin's settings screen, not a standalone script.
 export const DEAD_UPDATE_YML = `# neutered by the paseo-vibrancy plugin: this copy must never self-update.
 # Updates come from Settings -> Plugins -> paseo-vibrancy -> Vibrancy -> Update & restart.
 provider: generic
@@ -53,14 +55,20 @@ url: https://127.0.0.1:1/paseo-vibrancy-disabled/
 updaterCacheDirName: '@getpaseodesktop-updater'
 `;
 
+const BUNDLE_ID_SLOT = "<CFBundleIdentifier>";
+
+/** The outer bundle's designated requirement; `signAdHoc` fills in the bundle id. */
+export const DESIGNATED_REQUIREMENT = `designated => identifier "${BUNDLE_ID_SLOT}"`;
+
 /**
  * Serialises every byte-affecting build input for `buildFingerprint`:
  * `BUILD_TABLES` (every renderer/index.html patch table and constant),
  * `ASAR_HOOK_LINE`/`ASAR_HOOK_ANCHOR` (the anchor's length decides the
  * asar's space-padding), `PV_JS`, `BLUR_M`/`BLUR_CLANG_ARGS`,
- * `DEAD_UPDATE_YML`, and the resolved terminal metrics — an edit to a patch,
- * the main-process hook, the blur addon or its compiler flags, the updater
- * neutering text, or the Ghostty derivation all land here. RegExp values
+ * `DEAD_UPDATE_YML`, `DESIGNATED_REQUIREMENT`, and the resolved terminal
+ * metrics — an edit to a patch, the main-process hook, the blur addon or its
+ * compiler flags, the updater neutering text, the signing requirement, or the
+ * Ghostty derivation all land here. RegExp values
  * serialise as `{source, flags}` — plain `JSON.stringify` otherwise drops
  * them as `{}`. `overrides` exists only so tests can prove each field is
  * actually hashed, without reaching for module-mocking to swap a `const`;
@@ -72,6 +80,7 @@ export function serialiseFingerprintInputs(
     asarHookAnchor?: string;
     deadUpdateYml?: string;
     blurClangArgs?: readonly string[];
+    designatedRequirement?: string;
   } = {},
 ): string {
   return JSON.stringify(
@@ -83,6 +92,7 @@ export function serialiseFingerprintInputs(
       BLUR_M,
       BLUR_CLANG_ARGS: overrides.blurClangArgs ?? BLUR_CLANG_ARGS,
       DEAD_UPDATE_YML: overrides.deadUpdateYml ?? DEAD_UPDATE_YML,
+      DESIGNATED_REQUIREMENT: overrides.designatedRequirement ?? DESIGNATED_REQUIREMENT,
       term,
     },
     (_key, value) => (value instanceof RegExp ? { source: value.source, flags: value.flags } : value),
@@ -148,6 +158,22 @@ async function copyTree(source: string, target: string): Promise<void> {
       await copyFile(from, to);
     }
   }
+}
+
+/**
+ * Ad-hoc signs `app` and everything nested in it. An ad-hoc signature's
+ * default designated requirement is its cdhash, which every rebuild changes,
+ * and TCC checks privacy grants such as Screen Recording against the
+ * requirement recorded when the grant was made, so a cdhash requirement
+ * loses the grant on each rebuild. The outer bundle is re-signed alone with
+ * an identifier-only requirement, which survives rebuilds. `--deep -r` would
+ * stamp it onto the helpers as well, whose identifiers differ, and
+ * `codesign --verify --deep --strict` then rejects them.
+ */
+export async function signAdHoc(app: string): Promise<void> {
+  await execFileAsync("codesign", ["--force", "--deep", "--sign", "-", app]);
+  const requirement = DESIGNATED_REQUIREMENT.replace(BUNDLE_ID_SLOT, bundleIdentifier(app));
+  await execFileAsync("codesign", ["--force", "--sign", "-", `-r=${requirement}`, app]);
 }
 
 /**
@@ -269,7 +295,7 @@ export async function buildStaging(opts: {
     // unsigned.
     if (platform === "darwin") {
       opts.onStep?.("sign");
-      await execFileAsync("codesign", ["--force", "--deep", "--sign", "-", staging]);
+      await signAdHoc(staging);
     }
 
     return { report, missed };

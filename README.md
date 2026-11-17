@@ -136,6 +136,18 @@ A sidebar notice appears when a newer Paseo release exists, or when the plugin h
 | `~/Library/Caches/paseo-vibrancy/` | `%LOCALAPPDATA%\paseo-vibrancy\cache` | Verified Paseo downloads |
 | `~/Library/Logs/paseo-vibrancy-swap.log` | `%LOCALAPPDATA%\paseo-vibrancy\swap.log` | What happened during the last restart |
 
+## Troubleshooting
+
+### macOS keeps asking for Screen Recording
+
+Copies built by plugin 0.5.2 or earlier looked like a new app to macOS after every rebuild, and stock Paseo shares the copy's entry in **Screen & System Audio Recording**, so turning it on in System Settings did not take. Copies built by later versions keep the same identity across rebuilds. After your first rebuild on such a version, grant the permission once more:
+
+1. Quit Paseo-Vibrancy.
+2. In **System Settings > Privacy & Security > Screen & System Audio Recording**, select **Paseo** and remove it with `−`. Or, from a terminal: `tccutil reset ScreenCapture sh.paseo.desktop`.
+3. Open Paseo-Vibrancy, repeat what asked for the permission, and allow it.
+
+The grant then lasts through later rebuilds, and it covers stock Paseo too.
+
 ## Uninstall
 
 ```sh

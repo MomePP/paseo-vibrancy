@@ -306,9 +306,12 @@ version being built (`cachedPristine`).
    `\nmissed` appended if any patch was `MISSED`) **before** signing — once
    the bundle is sealed, anything added under `Contents/Resources`  makes
    `codesign --verify` report a missing sealed resource.
-8. `codesign --force --deep --sign -` (ad-hoc). Editing anything under
-   `Contents/` invalidates the Developer ID signature, and the hardened
-   runtime refuses to launch unsigned.
+8. `signAdHoc`: `codesign --force --deep --sign -` (ad-hoc), then the outer
+   bundle alone again with
+   `-r='designated => identifier "<CFBundleIdentifier>"'`. Editing anything
+   under `Contents/` invalidates the Developer ID signature, and the
+   hardened runtime refuses to launch unsigned. The second pass is for TCC;
+   see "Privacy grants follow the designated requirement" below.
 
 `buildFingerprint` hashes every byte-affecting input — `BUILD_TABLES` (every
 renderer/html patch table and constant), the asar hook anchor/line, `pv.js`,
@@ -619,6 +622,32 @@ update completing).
   `rgba(24, 27, 26, 0)` with no backdrop filter to the overlay fill with
   `blur(24px) saturate(1.4)`. A new better-paseo surface needs a hook added
   here; ask upstream for a test id before reaching for structure.
+- **Privacy grants follow the designated requirement, not the bundle id.**
+  TCC stores the granting app's designated requirement (DR) with the grant
+  and checks the running app against it. A plain ad-hoc signature's DR is
+  its cdhash, so every rebuild invalidated the grant. The copy and stock
+  Paseo share `sh.paseo.desktop`, so there is one record, and toggling it in
+  System Settings kept the requirement already stored: the unified log
+  showed
+  `tccd: Failed to match existing code requirement for subject sh.paseo.desktop and service kTCCServiceScreenCapture`,
+  with the stored requirement being stock Paseo's Developer ID one
+  (`anchor apple generic … leaf[subject.OU] = "99ZMJMKU9Y"`). The build now
+  re-signs the outer bundle with `designated => identifier "sh.paseo.desktop"`,
+  which stays the same across rebuilds and which stock Paseo also satisfies
+  (`codesign --verify -R='identifier "sh.paseo.desktop"'` passes on it);
+  the accepted cost is that any ad-hoc app claiming that id matches the
+  grant. A second cost: Squirrel.Mac accepts an update that satisfies the
+  running app's DR, and a Developer ID-signed stock Paseo update does, so
+  the dead `app-update.yml` feed (`DEAD_UPDATE_YML`) is now the only thing
+  keeping an update from overwriting the patched copy.
+  `codesign --deep -r=…` is wrong here: it stamps the outer identifier onto
+  the helpers (`sh.paseo.desktop.helper`, …) and
+  `codesign --verify --deep --strict` then fails with "nested code is
+  modified or invalid". A record created before this change still holds the
+  old requirement, so it has to be removed (System Settings `−`, or
+  `tccutil reset ScreenCapture sh.paseo.desktop`) and granted once more.
+  Whether TCC then honours the grant across rebuilds is not yet confirmed
+  on a real reset and regrant.
 
 ## Verifying a build outside the GUI
 
