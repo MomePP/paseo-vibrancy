@@ -53,14 +53,20 @@ url: https://127.0.0.1:1/paseo-vibrancy-disabled/
 updaterCacheDirName: '@getpaseodesktop-updater'
 `;
 
+const BUNDLE_ID_SLOT = "<CFBundleIdentifier>";
+
+/** The outer bundle's designated requirement; `signAdHoc` fills in the bundle id. */
+export const DESIGNATED_REQUIREMENT = `designated => identifier "${BUNDLE_ID_SLOT}"`;
+
 /**
  * Serialises every byte-affecting build input for `buildFingerprint`:
  * `BUILD_TABLES` (every renderer/index.html patch table and constant),
  * `ASAR_HOOK_LINE`/`ASAR_HOOK_ANCHOR` (the anchor's length decides the
  * asar's space-padding), `PV_JS`, `BLUR_M`/`BLUR_CLANG_ARGS`,
- * `DEAD_UPDATE_YML`, and the resolved terminal metrics — an edit to a patch,
- * the main-process hook, the blur addon or its compiler flags, the updater
- * neutering text, or the Ghostty derivation all land here. RegExp values
+ * `DEAD_UPDATE_YML`, `DESIGNATED_REQUIREMENT`, and the resolved terminal
+ * metrics — an edit to a patch, the main-process hook, the blur addon or its
+ * compiler flags, the updater neutering text, the signing requirement, or the
+ * Ghostty derivation all land here. RegExp values
  * serialise as `{source, flags}` — plain `JSON.stringify` otherwise drops
  * them as `{}`. `overrides` exists only so tests can prove each field is
  * actually hashed, without reaching for module-mocking to swap a `const`;
@@ -72,6 +78,7 @@ export function serialiseFingerprintInputs(
     asarHookAnchor?: string;
     deadUpdateYml?: string;
     blurClangArgs?: readonly string[];
+    designatedRequirement?: string;
   } = {},
 ): string {
   return JSON.stringify(
@@ -83,6 +90,7 @@ export function serialiseFingerprintInputs(
       BLUR_M,
       BLUR_CLANG_ARGS: overrides.blurClangArgs ?? BLUR_CLANG_ARGS,
       DEAD_UPDATE_YML: overrides.deadUpdateYml ?? DEAD_UPDATE_YML,
+      DESIGNATED_REQUIREMENT: overrides.designatedRequirement ?? DESIGNATED_REQUIREMENT,
       term,
     },
     (_key, value) => (value instanceof RegExp ? { source: value.source, flags: value.flags } : value),
@@ -162,7 +170,7 @@ async function copyTree(source: string, target: string): Promise<void> {
  */
 export async function signAdHoc(app: string): Promise<void> {
   await execFileAsync("codesign", ["--force", "--deep", "--sign", "-", app]);
-  const requirement = `designated => identifier "${bundleIdentifier(app)}"`;
+  const requirement = DESIGNATED_REQUIREMENT.replace(BUNDLE_ID_SLOT, bundleIdentifier(app));
   await execFileAsync("codesign", ["--force", "--sign", "-", `-r=${requirement}`, app]);
 }
 

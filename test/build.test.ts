@@ -68,11 +68,12 @@ test("buildFingerprint changes when any terminal setting changes, including ansi
   }
 });
 
-test("fingerprint serialisation is sensitive to DEAD_UPDATE_YML, ASAR_HOOK_ANCHOR and BLUR_CLANG_ARGS", () => {
+test("fingerprint serialisation is sensitive to DEAD_UPDATE_YML, ASAR_HOOK_ANCHOR, BLUR_CLANG_ARGS and DESIGNATED_REQUIREMENT", () => {
   const base = serialiseFingerprintInputs(BASE_TERM);
   assert.notEqual(base, serialiseFingerprintInputs(BASE_TERM, { deadUpdateYml: "something else" }));
   assert.notEqual(base, serialiseFingerprintInputs(BASE_TERM, { asarHookAnchor: "something else" }));
   assert.notEqual(base, serialiseFingerprintInputs(BASE_TERM, { blurClangArgs: ["something", "else"] }));
+  assert.notEqual(base, serialiseFingerprintInputs(BASE_TERM, { designatedRequirement: "something else" }));
 });
 
 test('stampFor joins version and fingerprint as "<ver>|vibrancy=<hash>"', () => {
