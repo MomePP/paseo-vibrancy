@@ -166,7 +166,7 @@ export function patchRenderer(src: string, term: TermMetrics): { src: string; no
     ARCHIVE_HIDES_STAT.expect,
     ARCHIVE_HIDES_STAT.requires,
   );
-  patcher.replaceRe(LABELS_LINE.label, LABELS_LINE.pattern, LABELS_LINE.replacement, LABELS_LINE.expect);
+  patcher.replaceReFirst(LABELS_LINE.label, LABELS_LINE.variants, LABELS_LINE.expect);
   patcher.replaceReFirst(TAB_FILLS.label, TAB_FILLS.variants, TAB_FILLS.expect);
   for (const { label, pattern, replacement, expect } of TAB_GLASS) {
     patcher.replaceRe(label, pattern, replacement, expect);

@@ -342,6 +342,55 @@ test("patchRenderer glasses Paseo 0.16's derived selection, stepping dark themes
   assert.equal(light(pluginTheme).surfaceSidebarSelected, "rgba(18, 52, 86, 0.8)");
 });
 
+const META_ROW_0_15 = String.raw`e.WorkspaceMetaRow=function(c){const o=(0,s.c)(14),{hostBadge:p}=c,P=(0,j.selectMetaRowItems)(c);let L,W,B,R;L=t.View,W=Z.row,o[12]!==p?(B=(t,s)=>(0,I.jsxs)(l.Fragment,{children:[s>0?(0,I.jsx)(n.Text,{style:Z.separator,children:"\xb7"}):null,(0,I.jsx)(O,{item:t,hostBadge:p,leading:0===s})]},t.kind),o[12]=p,o[13]=B):B=o[13],R=P.map(B);return(0,I.jsx)(L,{style:W,children:R})}`;
+const META_ROW_0_16 = String.raw`e.WorkspaceMetaRow=function(c){const o=(0,s.c)(11),{currentBranch:u,projectName:h,hostBadge:p,prHint:f,serviceSummary:k,labels:S,workspace:x,backdrop:y}=c,_=void 0===S?D:S,v=void 0===x?null:x,{rowItems:z,checksDisplay:H}=(0,b.useSidebarMetaPreferences)(),P=(0,j.selectMetaRowItems)({currentBranch:u,projectName:h,hasHostBadge:null!==p,prHint:f,serviceSummary:k,labels:_,visible:z,checksDisplay:H}),T=(0,w.usePluginWorkspaceRowBadgeItems)(v?.serverId??null);if(0===P.length&&(!v||0===T.length))return null;const L=t.View,W=Z;let B;o[0]!==y||o[1]!==p?(B=(t,s)=>(0,I.jsxs)(l.Fragment,{children:[s>0?(0,I.jsx)(n.Text,{style:[Z.separator,"surfaceSidebarHover"===y&&Z.separatorHovered,"surfaceSidebarSelected"===y&&Z.separatorSelected],children:"\xb7"}):null,(0,I.jsx)(O,{item:t,hostBadge:p,leading:0===s})]},t.kind),o[0]=y,o[1]=p,o[2]=B):B=o[2];const R=P.map(B);let E,M;o[3]!==T||o[4]!==v?(E=v?(0,I.jsx)(w.PluginWorkspaceRowBadgeItems,{targets:T,workspaceId:v.workspaceId}):null,o[3]=T,o[4]=v,o[5]=E):E=o[5];o[6]!==L||o[7]!==W.row||o[8]!==R||o[9]!==E?(M=(0,I.jsxs)(L,{style:W.row,children:[R,E]}),o[6]=L,o[7]=W.row,o[8]=R,o[9]=E,o[10]=M):M=o[10];return M}`;
+
+type Element = { type: string; props: { style?: unknown; children?: unknown; item?: { kind: string }; leading?: boolean }; key?: string };
+
+function renderMetaRow(src: string): Element {
+  const { src: patched, notes } = patchRenderer(src, DEFAULT_TERM);
+  assert.ok(notes.includes("ok      workspace labels on their own line (1x)"));
+  const jsx = (type: string, props: Element["props"], key?: string): Element => ({ type, props, key });
+  const scope = {
+    s: { c: (size: number) => Array(size).fill(Symbol("empty")) },
+    t: { View: "View" },
+    n: { Text: "Text" },
+    l: { Fragment: "Fragment" },
+    I: { jsx, jsxs: jsx },
+    Z: { row: "row", separator: "separator" },
+    O: "MetaItem",
+    D: [],
+    b: { useSidebarMetaPreferences: () => ({ rowItems: {}, checksDisplay: "icon" }) },
+    j: { selectMetaRowItems: () => [{ kind: "branch" }, { kind: "changeRequest" }, { kind: "labels" }] },
+    w: { usePluginWorkspaceRowBadgeItems: () => ["plugin"], PluginWorkspaceRowBadgeItems: "PluginItems" },
+  };
+  const e: { WorkspaceMetaRow?: (props: object) => Element } = {};
+  new Function("e", ...Object.keys(scope), patched)(e, ...Object.values(scope));
+  return e.WorkspaceMetaRow!({ hostBadge: null, backdrop: "surfaceSidebar", workspace: { serverId: "s", workspaceId: "w" } });
+}
+
+function assertLabelsOnOwnLine(root: Element, metaLine: string[]): void {
+  assert.deepEqual(root.props.style, { flexDirection: "column", gap: 2, minWidth: 0 });
+  const [meta, labels, ...rest] = root.props.children as Element[];
+  assert.equal(rest.length, 0);
+  assert.equal(meta!.props.style, "row");
+  const metaChildren = [meta!.props.children].flat(2) as Element[];
+  assert.deepEqual(metaChildren.map((child) => child.key ?? child.type), metaLine);
+  assert.equal(labels!.props.style, "row");
+  const chip = labels!.props.children as Element;
+  assert.equal(chip.type, "MetaItem");
+  assert.equal(chip.props.item!.kind, "labels");
+  assert.equal(chip.props.leading, true);
+}
+
+test("patchRenderer moves the workspace labels under the meta line on Paseo 0.15", () => {
+  assertLabelsOnOwnLine(renderMetaRow(META_ROW_0_15), ["branch", "changeRequest"]);
+});
+
+test("patchRenderer moves the workspace labels under the meta line on Paseo 0.16, plugin items staying on it", () => {
+  assertLabelsOnOwnLine(renderMetaRow(META_ROW_0_16), ["branch", "changeRequest", "PluginItems"]);
+});
+
 test("patchRenderer maps Paseo 0.13's tab chip backdrops to the glass fills", () => {
   const colors = {
     surface1: "s1",
