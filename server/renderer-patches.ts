@@ -677,6 +677,43 @@ export const FLOATING_SURFACES_CSS = `
       [data-menu-surface="true"] {
         -webkit-app-region: initial !important;
       }
+      /* better-paseo's name tooltip has no test id or name: it is the
+         lone-text bubble in a top-layer [popover], which Paseo itself never
+         opens */
+      :is(
+        [data-testid="menu-panel"],
+        [data-testid="menu-submenu-panel"],
+        [data-testid="hover-preview"],
+        [data-testid="toolbar-details-frame"],
+        [data-testid="preview-line-selection-menu"],
+        [data-testid="details-zoom-badge"],
+        [data-testid="details-back-to-latest"]:not(:active),
+        [data-testid="details-drawer"],
+        [data-testid="details-floating"],
+        [data-testid="sidebar-floating"],
+        [data-testid="board-tip"],
+        [data-testid="task-card-hint"],
+        [data-testid="task-card-context-details"],
+        [data-testid="detail-context-tip"],
+        [data-testid="detail-tokens-tip"],
+        [data-testid="phone-board-notice"],
+        [data-testid="phone-scroll-bottom"],
+        [aria-label="Copy selected block"]:not(:active),
+        div:has(> div > :is([aria-label="Copy as Markdown"], [aria-label="Copy as image"])),
+        [popover]:not([data-testid]) > div:has(> div[dir="auto"]:only-child)
+      ) {
+        background-color: ${OVERLAY_FILL} !important;
+        backdrop-filter: ${GLASS_BLUR} !important;
+        border-color: transparent !important;
+        -webkit-app-region: initial !important;
+      }
+      /* the selection bar draws in a shadow root that reads its fill from a
+         variable on the host; 12px is better-paseo's FLOAT.radius */
+      [data-bcselectionbar] {
+        --bc-bar-bg: ${OVERLAY_FILL} !important;
+        backdrop-filter: ${GLASS_BLUR} !important;
+        border-radius: 12px !important;
+      }
       /* xterm sits flush against the pane edge; FitAddon subtracts this */
       .xterm {
         padding: __PADDING__;
