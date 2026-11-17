@@ -157,7 +157,8 @@ own file, and that device's `pv.js` picks the change up.
   small `executeJavaScript` script in the page that sets on
   `document.documentElement`:
   - `--paseo-tint` — consumed by the body wash rule:
-    `background-color: color-mix(in srgb, var(--colors-surface1, <stock hex>) calc(var(--paseo-tint, <default>) * 100%), transparent);`
+    `--paseo-wash-base: var(--colors-surface1, <stock hex>); background-color: color-mix(in srgb, var(--paseo-wash-base) calc(var(--paseo-tint, <default>) * 100%), transparent);`
+    (`--paseo-wash-base` is also the solid floating backdrop's flood colour)
   - `--paseo-pane-bg` — `transparent` when `paneGlass`, else
     `var(--colors-surface1)`; consumed by the navigator backdrop patch.
 

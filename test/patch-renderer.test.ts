@@ -106,7 +106,7 @@ test("patchIndexHtml rewrites the flash guard into the live color-mix wash and i
   const { html: patched, notes } = patchIndexHtml(html, "0 0 0 10px");
   assert.ok(
     patched.includes(
-      "body { background-color: color-mix(in srgb, var(--colors-surface1, #181b1a) calc(var(--paseo-tint, 0.85) * 100%), transparent);",
+      "body { --paseo-wash-base: var(--colors-surface1, #181b1a); background-color: color-mix(in srgb, var(--paseo-wash-base) calc(var(--paseo-tint, 0.85) * 100%), transparent);",
     ),
   );
   assert.ok(patched.indexOf('<style id="paseo-vibrancy-floating-surfaces">') < patched.indexOf("</head>"));

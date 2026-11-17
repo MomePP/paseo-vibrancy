@@ -193,14 +193,10 @@ const FROST_FILL = "var(--paseo-frost-fill)";
 const FROST_BLUR = "blur(14px) saturate(1.2)";
 const OVERLAY_FILL = "var(--paseo-overlay-fill)";
 
-// The page under a floating surface is itself see-through (the body wash is
-// the tint), so its blurred backdrop keeps that alpha, and Chromium draws the
-// filtered backdrop source-over the unblurred pixels: crisp text behind a
-// popup stayed readable at about (1 - tint) * (1 - fill). Floating surfaces
-// end their backdrop filter on this SVG filter, which lays the blurred
-// backdrop over an opaque flood of the wash colour, so nothing unblurred is
-// left under the fill. The flood reads the theme var, so it follows a live
-// theme switch; the window material no longer shows through a popup.
+// Chromium composites a backdrop filter's result over the unblurred backdrop,
+// and the wash under a floating surface is translucent, so crisp text shows
+// through the blur. Ending the filter on this SVG filter (blurred backdrop
+// over an opaque flood) leaves nothing unblurred underneath.
 const SOLID_BACKDROP_ID = "paseo-vibrancy-solid-backdrop";
 const FLOATING_BLUR = `${GLASS_BLUR} url(#${SOLID_BACKDROP_ID})`;
 
@@ -688,9 +684,10 @@ export const HTML_FLASH_GUARD = /(html,\s*body\s*\{\s*background-color:\s*)#([0-
 // matching VIBRANCY_DEFAULTS.tint) rather than a baked-in rgba, so a later live
 // control can retint without a rebuild. `$2` is HTML_FLASH_GUARD's captured
 // hex, reused as the `--colors-surface1` fallback so the wash matches
-// whichever dark surface Paseo shipped.
+// whichever dark surface Paseo shipped. `--paseo-wash-base` carries that
+// colour to SOLID_BACKDROP_SVG's flood.
 export const HTML_WASH_REPLACEMENT =
-  "body { background-color: color-mix(in srgb, var(--colors-surface1, #$2) calc(var(--paseo-tint, 0.85) * 100%), transparent);";
+  "body { --paseo-wash-base: var(--colors-surface1, #$2); background-color: color-mix(in srgb, var(--paseo-wash-base) calc(var(--paseo-tint, 0.85) * 100%), transparent);";
 
 // Floating surfaces (menus, dialogs, listboxes, tooltips) inherit `surface0`
 // rather than `popover`, so zeroing that token took them with it. Fixed with
@@ -788,14 +785,13 @@ export const FLOATING_SURFACES_CSS = `
     </style>
 `;
 
-// The filter FLOATING_BLUR ends on. A backdrop filter can only reference a
-// filter in the same document, so it goes in the body, ahead of React's root.
-// `flood-color` is a style property, so the theme var resolves (and updates)
-// like any other; the fallback matches the wash's.
+// The filter FLOATING_BLUR ends on; it must live in the same document as the
+// surfaces, ahead of React's root. `flood-color` is set through `style` so
+// the theme var resolves (a presentation attribute would not take `var()`).
 export const SOLID_BACKDROP_SVG = `
     <svg aria-hidden="true" width="0" height="0" style="position: absolute">
       <filter id="${SOLID_BACKDROP_ID}" color-interpolation-filters="sRGB">
-        <feFlood style="flood-color: var(--colors-surface1, #181B1A)" result="base" />
+        <feFlood style="flood-color: var(--paseo-wash-base)" result="base" />
         <feComposite in="SourceGraphic" in2="base" operator="over" />
       </filter>
     </svg>
