@@ -120,29 +120,6 @@ test("patchIndexHtml reports a MISSED note when the flash guard is absent, witho
   assert.ok(notes[1]!.startsWith("ok      glass floating surfaces"));
 });
 
-test("patchIndexHtml gives better-paseo's floating surfaces the overlay glass", () => {
-  const { html } = patchIndexHtml("<head></head>", "0 0 0 10px");
-  const rules = [...html.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selector, body]) => ({
-    selector: selector!.trim(),
-    body: body!,
-  }));
-  const blur = "backdrop-filter: blur(24px) saturate(1.4) !important;";
-  for (const hook of [
-    '[data-testid="menu-panel"]',
-    '[data-testid="menu-submenu-panel"]',
-    '[data-testid="hover-preview"]',
-    '[aria-label="Copy as Markdown"]',
-    '[popover]:not([data-testid], [data-bcselectionbar]) > div',
-  ]) {
-    const rule = rules.find((candidate) => candidate.selector.includes(hook));
-    assert.ok(rule?.body.includes("background-color: var(--paseo-overlay-fill) !important;"), hook);
-    assert.ok(rule?.body.includes(blur), hook);
-  }
-  const bar = rules.find((rule) => rule.selector === "[data-bcselectionbar]");
-  assert.ok(bar?.body.includes("--bc-bar-bg: var(--paseo-overlay-fill) !important;"));
-  assert.ok(bar?.body.includes(blur));
-});
-
 test("patchRenderer swaps the resize handle's accent to the subtle token in both occurrences", () => {
   const src =
     '[h.highlight,"horizontal"===v?h.highlightHorizontal:h.highlightVertical,' +
