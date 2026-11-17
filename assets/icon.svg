@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <clipPath id="tile"><rect width="512" height="512" rx="112"/></clipPath>
+    <clipPath id="glass"><rect x="92" y="132" width="328" height="248" rx="48"/></clipPath>
+    <filter id="soften" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="22"/></filter>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/>
+      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.14"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.18"/>
+    </linearGradient>
+    <g id="blobs">
+      <circle cx="150" cy="150" r="104" fill="#c693ff"/>
+      <circle cx="376" cy="176" r="92" fill="#33b1ff"/>
+      <circle cx="262" cy="396" r="112" fill="#ff7eb6"/>
+      <circle cx="420" cy="410" r="64" fill="#42be65"/>
+    </g>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="512" height="512" fill="#161616"/>
+    <use href="#blobs"/>
+    <g clip-path="url(#glass)">
+      <rect width="512" height="512" fill="#161616" opacity="0.5"/>
+      <use href="#blobs" filter="url(#soften)"/>
+    </g>
+    <rect x="92" y="132" width="328" height="248" rx="48" fill="url(#sheen)"/>
+    <rect x="93.5" y="133.5" width="325" height="245" rx="46.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  </g>
+</svg>

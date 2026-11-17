@@ -1,4 +1,8 @@
 {
   "id": "paseo-vibrancy",
+  "name": "Vibrancy",
+  "description": "A frosted-glass Paseo for macOS and Windows, rebuilt and kept up to date from inside the app.",
+  "icon": "assets/icon.png",
+  "media": ["docs/hero.png"],
   "requirements": { "paseo": ">=0.11.0" }
 }
