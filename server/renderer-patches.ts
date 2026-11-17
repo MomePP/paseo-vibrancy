@@ -193,6 +193,13 @@ const FROST_FILL = "var(--paseo-frost-fill)";
 const FROST_BLUR = "blur(14px) saturate(1.2)";
 const OVERLAY_FILL = "var(--paseo-overlay-fill)";
 
+// Chromium composites a backdrop filter's result over the unblurred backdrop,
+// and the wash under a floating surface is translucent, so crisp text shows
+// through the blur. Ending the filter on this SVG filter (blurred backdrop
+// over an opaque flood) leaves nothing unblurred underneath.
+const SOLID_BACKDROP_ID = "paseo-vibrancy-solid-backdrop";
+const FLOATING_BLUR = `${GLASS_BLUR} url(#${SOLID_BACKDROP_ID})`;
+
 // Workspace tabs and sidebar workspace rows share their states: hover (and
 // the active tab of an unfocused pane) is the floating-surface fill, base01
 // at 60%, so a hovered row matches the hover card it opens; the focused tab
@@ -518,13 +525,13 @@ export const GLASS_SURFACES: ExpectedReTableEntry[] = [
   {
     label: "glass annotate card",
     pattern: /(annotationCard:\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface0/g,
-    replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${GLASS_BLUR}"`,
+    replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${FLOATING_BLUR}"`,
     expect: 1,
   },
   {
     label: "glass toast pill",
     pattern: /(toast:(?:Object\.assign\()?\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface0/g,
-    replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${GLASS_BLUR}"`,
+    replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${FLOATING_BLUR}"`,
     expect: 1,
   },
   {
@@ -570,7 +577,7 @@ export const GLASS_SURFACES: ExpectedReTableEntry[] = [
   {
     label: "glass autocomplete detail card",
     pattern: /(detailCard:(?:Object\.assign\()?\{[^{}]*?backgroundColor:)[A-Za-z_$][\w$]*\.colors\.surface1,borderWidth:[A-Za-z_$][\w$]*\.borderWidth\[1\]/g,
-    replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${GLASS_BLUR}",borderWidth:0`,
+    replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${FLOATING_BLUR}",borderWidth:0`,
     expect: 1,
     requires: "detailCard:",
   },
@@ -578,7 +585,7 @@ export const GLASS_SURFACES: ExpectedReTableEntry[] = [
     label: "glass autocomplete list",
     pattern:
       /(container:(?:Object\.assign\()?\{flexShrink:1,minHeight:\d+,backgroundColor:)([A-Za-z_$][\w$]*)\.colors\.surface1,borderWidth:\2\.borderWidth\[1\](,borderColor:\2\.colors\.borderAccent,borderRadius:\2\.borderRadius\.lg,overflow:"hidden")/g,
-    replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${GLASS_BLUR}",borderWidth:0$3`,
+    replacement: `$1"${OVERLAY_FILL}",backdropFilter:"${FLOATING_BLUR}",borderWidth:0$3`,
     expect: 1,
   },
   {
@@ -677,9 +684,10 @@ export const HTML_FLASH_GUARD = /(html,\s*body\s*\{\s*background-color:\s*)#([0-
 // matching VIBRANCY_DEFAULTS.tint) rather than a baked-in rgba, so a later live
 // control can retint without a rebuild. `$2` is HTML_FLASH_GUARD's captured
 // hex, reused as the `--colors-surface1` fallback so the wash matches
-// whichever dark surface Paseo shipped.
+// whichever dark surface Paseo shipped. `--paseo-wash-base` carries that
+// colour to SOLID_BACKDROP_SVG's flood.
 export const HTML_WASH_REPLACEMENT =
-  "body { background-color: color-mix(in srgb, var(--colors-surface1, #$2) calc(var(--paseo-tint, 0.85) * 100%), transparent);";
+  "body { --paseo-wash-base: var(--colors-surface1, #$2); background-color: color-mix(in srgb, var(--paseo-wash-base) calc(var(--paseo-tint, 0.85) * 100%), transparent);";
 
 // Floating surfaces (menus, dialogs, listboxes, tooltips) inherit `surface0`
 // rather than `popover`, so zeroing that token took them with it. Fixed with
@@ -703,7 +711,7 @@ export const FLOATING_SURFACES_CSS = `
       [role="tooltip"],
       [data-menu-surface="true"] {
         background-color: ${OVERLAY_FILL} !important;
-        backdrop-filter: ${GLASS_BLUR} !important;
+        backdrop-filter: ${FLOATING_BLUR} !important;
         border-color: transparent !important;
       }
       /* the diff's sticky file header: a header-sized canvas, painted with
@@ -726,8 +734,11 @@ export const FLOATING_SURFACES_CSS = `
         -webkit-app-region: initial !important;
       }
       /* better-paseo's name tooltip has no test id or name: it is the
-         lone-text bubble in a top-layer [popover], which Paseo itself never
-         opens */
+         lone-text bubble in a top-layer [popover] (which Paseo itself never
+         opens), or, where nothing clips it, in the slot right after its
+         button inside better-paseo's own root. In that slot only the
+         bubble's inline box-shadow (its tooltipLook) tells it from in-pane
+         content of the same shape, such as an opened system card's body */
       :is(
         [data-testid="menu-panel"],
         [data-testid="menu-submenu-panel"],
@@ -748,10 +759,11 @@ export const FLOATING_SURFACES_CSS = `
         [data-testid="phone-scroll-bottom"],
         [aria-label="Copy selected block"]:not(:active),
         div:has(> div > :is([aria-label="Copy as Markdown"], [aria-label="Copy as image"])),
-        [popover]:not([data-testid]) > div:has(> div[dir="auto"]:only-child)
+        [popover]:not([data-testid]) > div:has(> div[dir="auto"]:only-child),
+        [data-bcroot] :is([role="button"], [role="img"]) + div > div[style*="box-shadow"]:has(> div[dir="auto"]:only-child)
       ) {
         background-color: ${OVERLAY_FILL} !important;
-        backdrop-filter: ${GLASS_BLUR} !important;
+        backdrop-filter: ${FLOATING_BLUR} !important;
         border-color: transparent !important;
         -webkit-app-region: initial !important;
       }
@@ -759,7 +771,7 @@ export const FLOATING_SURFACES_CSS = `
          variable on the host; 12px is better-paseo's FLOAT.radius */
       [data-bcselectionbar] {
         --bc-bar-bg: ${OVERLAY_FILL} !important;
-        backdrop-filter: ${GLASS_BLUR} !important;
+        backdrop-filter: ${FLOATING_BLUR} !important;
         border-radius: 12px !important;
       }
       /* xterm sits flush against the pane edge; FitAddon subtracts this */
@@ -773,6 +785,18 @@ export const FLOATING_SURFACES_CSS = `
         font-weight: 500 !important;
       }
     </style>
+`;
+
+// The filter FLOATING_BLUR ends on; it must live in the same document as the
+// surfaces, ahead of React's root. `flood-color` is set through `style` so
+// the theme var resolves (a presentation attribute would not take `var()`).
+export const SOLID_BACKDROP_SVG = `
+    <svg aria-hidden="true" width="0" height="0" style="position: absolute">
+      <filter id="${SOLID_BACKDROP_ID}" color-interpolation-filters="sRGB">
+        <feFlood style="flood-color: var(--paseo-wash-base)" result="base" />
+        <feComposite in="SourceGraphic" in2="base" operator="over" />
+      </filter>
+    </svg>
 `;
 
 // Every table/constant above, aggregated for the build fingerprint: a
@@ -819,4 +843,5 @@ export const BUILD_TABLES = {
   HTML_FLASH_GUARD,
   HTML_WASH_REPLACEMENT,
   FLOATING_SURFACES_CSS,
+  SOLID_BACKDROP_SVG,
 } as const;

@@ -35,6 +35,7 @@ import {
   RENDERER_PATCHES,
   SCRIM_COLOURS,
   SELECTION_FILLS,
+  SOLID_BACKDROP_SVG,
   STOCK_ANSI,
   SURFACE_PATCHES,
   TAB_FILLS,
@@ -207,6 +208,14 @@ export function patchIndexHtml(html: string, padding: string): { html: string; n
     const css = FLOATING_SURFACES_CSS.replace("__PADDING__", padding);
     src = src.replace("</head>", `${css}  </head>`);
     notes.push("ok      glass floating surfaces (1x)");
+  }
+
+  const body = /<body\b[^>]*>/;
+  if (!body.test(src)) {
+    notes.push("MISSED  solid floating backdrop: no <body> to inject after");
+  } else {
+    src = src.replace(body, (open) => `${open}${SOLID_BACKDROP_SVG}`);
+    notes.push("ok      solid floating backdrop (1x)");
   }
 
   return { html: src, notes };

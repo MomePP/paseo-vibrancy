@@ -157,7 +157,8 @@ own file, and that device's `pv.js` picks the change up.
   small `executeJavaScript` script in the page that sets on
   `document.documentElement`:
   - `--paseo-tint` — consumed by the body wash rule:
-    `background-color: color-mix(in srgb, var(--colors-surface1, <stock hex>) calc(var(--paseo-tint, <default>) * 100%), transparent);`
+    `--paseo-wash-base: var(--colors-surface1, <stock hex>); background-color: color-mix(in srgb, var(--paseo-wash-base) calc(var(--paseo-tint, <default>) * 100%), transparent);`
+    (`--paseo-wash-base` is also the solid floating backdrop's flood colour)
   - `--paseo-pane-bg` — `transparent` when `paneGlass`, else
     `var(--colors-surface1)`; consumed by the navigator backdrop patch.
 
@@ -622,6 +623,66 @@ update completing).
   `rgba(24, 27, 26, 0)` with no backdrop filter to the overlay fill with
   `blur(24px) saturate(1.4)`. A new better-paseo surface needs a hook added
   here; ask upstream for a test id before reaching for structure.
+- **A blurred backdrop in a see-through page leaks the unblurred content.**
+  The page under a popup is itself translucent (the body wash is
+  `--paseo-tint`), so the blurred backdrop keeps that alpha, and Chromium
+  draws the filtered backdrop source-over the unblurred pixels instead of
+  replacing them. Crisp text behind every glass popup stayed readable at
+  about `(1 - tint) * (1 - fill)`: with the user's tint 0.6 and the 0.6
+  overlay fill, 0.16. A fixed probe `div` with only `blur(24px)` showed the
+  same over plain chat text; over an opaque surface (the user bubble) the
+  blur hid it. This is what the user reported as see-through Turn details
+  (its even rows paint `surface0`, alpha 0, so they showed the leak; its odd
+  rows paint an opaque `surface1`) and a see-through tool hover preview.
+  Both already had the overlay fill and blur. Every floating-surface
+  backdrop filter (the CSS rules and the annotate card, toast and
+  autocomplete list bundle patches) now ends on
+  `url(#paseo-vibrancy-solid-backdrop)`, an SVG filter injected at the top
+  of `<body>` (`SOLID_BACKDROP_SVG`; a backdrop filter can only reference a
+  filter in its own document). It lays the blurred backdrop over an
+  `feFlood` of `var(--colors-surface1)` with `feComposite operator="over"`,
+  so nothing unblurred is left under the fill. The flood is the wash's own
+  colour, not black: forcing alpha to 1 with `feFuncA` turned the clear
+  window pixels black and would grey a light theme's popups. `flood-color`
+  is a style property, so it follows a theme switch live: Dark to Light
+  moved it from `rgb(30, 33, 32)` to `rgb(250, 250, 250)` without a reload.
+  Trade-off: the window material no longer shows through a floating
+  surface; in-pane frost and glass are unchanged. The diff's sticky file
+  header canvas is in-pane too, so it keeps plain `GLASS_BLUR`
+  (`blur(24px) saturate(1.4)`, no flood): the code scrolling under it stays
+  faintly visible, as before. Raising the fill instead of flooding still leaked
+  faintly at 0.85. Measured with a CDP sweep of every floating
+  root (fixed, z-indexed, top layer, floating roles, open shadow roots) in
+  an isolated Paseo-Vibrancy 0.16.0 with better-paseo 1.6.0 (c85f2412) and
+  the user's `paseo-vibrancy.json` (tint 0.6), on the Dark theme: Turn
+  details (`toolbar-details-frame`), hover preview inline and maximized
+  (`hover-preview`), the selection bar, the composer autocomplete, Paseo's
+  combobox popups, context-window card, workspace hover card and command
+  palette, and the menus (workspace header, split pane, attach, commit,
+  sidebar display, workspace and project kebabs, hosts, help, tab context,
+  new tab) went from leak 0.16 to 0. On Light, Turn details, the hover
+  preview, the name tooltip and the workspace header menu measured 0 with
+  no grey cast. better-paseo's name tooltip in its inline slot (no
+  `[popover]`, so the existing hook missed it) had no glass at all
+  (`rgba(24, 27, 26, 0)`, no filter, leak 1); it is now hooked as the
+  lone-text bubble after its `[role="button"]`/`[role="img"]` inside
+  `[data-bcroot]` that carries an inline `box-shadow`. That last part is
+  what keeps in-pane content out: an opened prose system card
+  (`system-card.tsx`, a `DisclosureHeader` with `role="button"`, then
+  `FadeIn` > body > one `Text`) has the same shape and took the overlay
+  fill and solid flood until it was added. The tooltip bubble's look comes
+  from `tooltipLook` (`toolbar-button.tsx`), a plain style object that
+  RN-web writes inline, while the card body's styles come from
+  `StyleSheet.create` and render as classes. The slot's `position:
+  absolute`, `z-index: 10` and `pointer-events: none` would say "floating"
+  more directly, but RN-web renders them as atomic class names only, which
+  no rule should key on. Measured over CDP: the Copy reply and start time
+  tooltips kept the overlay fill and the flooded blur, and the card body
+  went back to its stock `rgba(0, 0, 0, 0)` with no filter (its slab, the
+  `FadeIn`, stays `rgb(30, 33, 32)`). Testing note: Chromium caches the
+  renderer bundle by its hashed name, so after rewriting a copy's bundle in
+  place reload with `Page.reload({ ignoreCache: true })`, or the old inline
+  styles stay.
 - **Privacy grants follow the designated requirement, not the bundle id.**
   TCC stores the granting app's designated requirement (DR) with the grant
   and checks the running app against it. A plain ad-hoc signature's DR is
