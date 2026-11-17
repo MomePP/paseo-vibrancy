@@ -576,6 +576,25 @@ update completing).
   0.11 and 0.12. The deprecated entry stays until `requirements.paseo` is
   raised to `>=0.13.0`; the SDK removes it after 2027-04-20. The devDependency
   stays pinned to the minimum host (0.11.0) for the same reason.
+- **Plugins get the transparent `surface0` too.** A plugin's theme is
+  Paseo's, so a plugin panel filled with `surface0` goes clear under
+  SURFACE_PATCHES, and the role-based floating-surfaces rules only rescue
+  panels that carry a role. better-paseo (RoundRedDot/better-paseo) fills its
+  menus, hover preview, tooltips and floating controls with `surface0` and no
+  role, so FLOATING_SURFACES_CSS has a block for it keyed on its test ids
+  (RN-web renders `testID` as `data-testid`), two accessible names, and the
+  name tooltip's top-layer `[popover]` (Paseo 0.16 opens none of its own).
+  Its selection bar lives in a shadow root: the fill goes through its
+  `--bc-bar-bg` variable (an `!important` sheet rule beats the inline
+  `setProperty`) and the blur on the host. Its details panel sets
+  `app-region: no-drag !important` inline, which no sheet rule overrides.
+  Measured over CDP in an isolated Paseo-Vibrancy 0.16.0 with better-paseo
+  cb7cf63: the Workspace dropdown, card menu and submenu, hover preview,
+  name tooltip, board tip, card hint, table copy control, selection bar,
+  floating board sidebar and floating details panel went from
+  `rgba(24, 27, 26, 0)` with no backdrop filter to the overlay fill with
+  `blur(24px) saturate(1.4)`. A new better-paseo surface needs a hook added
+  here; ask upstream for a test id before reaching for structure.
 
 ## Verifying a build outside the GUI
 
@@ -592,6 +611,17 @@ clean build reports zero `lastReport` lines starting with `MISSED`,
 `lastError` is `null`, and
 `codesign --verify --deep --strict ~/Applications/.Paseo-Vibrancy.staging.app`
 exits 0.
+
+A stylesheet change needs no build: run the installed copy isolated (see
+the Windows testing notes; on macOS `PASEO_HOME=… PASEO_ELECTRON_USER_DATA_DIR=…
+~/Applications/Paseo-Vibrancy.app/Contents/MacOS/Paseo --remote-debugging-port=…`)
+and replace the text of `#paseo-vibrancy-floating-surfaces` over CDP. Plugins
+load only with top-level `"pluginsEnabled": true` in the isolated
+`config.json`. `paseo run --home <PASEO_HOME>` from inside a Paseo agent
+needs `PASEO_AGENT_ID` and `PASEO_WORKSPACE_ID` unset, or it targets the
+caller's workspace on the other daemon. Electron serves no
+`Browser.setWindowBounds`; `Emulation.setDeviceMetricsOverride` sets the
+layout width instead.
 
 ## Windows (since the `feature/windows-support` port, Paseo 0.12.0)
 
