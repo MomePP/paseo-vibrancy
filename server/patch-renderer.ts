@@ -34,6 +34,7 @@ import {
   PANE,
   RENDERER_PATCHES,
   SCRIM_COLOURS,
+  SELECTION_FILLS,
   STOCK_ANSI,
   SURFACE_PATCHES,
   TAB_FILLS,
@@ -84,6 +85,9 @@ export function patchRenderer(src: string, term: TermMetrics): { src: string; no
 
   for (const { label, pattern, replacement, expect } of SURFACE_PATCHES) {
     patcher.replaceRe(label, pattern, replacement, expect);
+  }
+  for (const { label, variants, expect } of SELECTION_FILLS) {
+    patcher.replaceReFirst(label, variants, expect);
   }
 
   patcher.replaceRe(

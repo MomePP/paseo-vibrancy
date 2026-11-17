@@ -23,6 +23,13 @@ export type ExpectedReTableEntry = ReTableEntry & {
   requires?: string;
 };
 
+/** One patch whose anchor differs between Paseo versions; `Patcher.replaceReFirst` applies the first shape present. */
+export type VariantReTableEntry = {
+  label: string;
+  expect: number;
+  variants: readonly { pattern: RegExp; replacement: string }[];
+};
+
 // --- the look (fixed) -------------------------------------------------------
 //
 // Every React surface token goes to alpha 0 — left non-zero, a nested
@@ -352,9 +359,7 @@ export const ALPHA_HELPER =
   '+parseInt(v.slice(4,6),16)+", "+a+")"};\n';
 
 // The four large-area surface tokens (surface0, background, sidebar,
-// workspace), alpha 0 always, plus the selection: the selected sidebar row
-// (and, through TAB_GLASS, the focused tab) is the theme's selection colour
-// at 0.6, glass blended with what is behind it rather than an opaque slab.
+// workspace), alpha 0 always.
 // Patches the theme factories' *outputs*, not the palettes feeding them:
 // `surface0` is also `primaryForeground` and `surface2` is `popover`/`input`/
 // `muted`, so an alpha at the palette would make button text and popovers
@@ -391,21 +396,51 @@ export const SURFACE_PATCHES: ExpectedReTableEntry[] = [
     replacement: "surfaceWorkspace:__paseoAlpha($1.surface1,0.0),interactionHighlight:",
     expect: 1,
   },
+];
+
+// The selection: the selected sidebar row (and, through TAB_GLASS, the
+// focused tab) is a selection colour at 0.8, glass blended with what is
+// behind it rather than an opaque slab. Dark themes select with about the
+// hover fill's colour, so the selection steps up to `surface3` to stay
+// distinct; light themes keep their own selection. Up to 0.16.0-beta.1 the
+// factories select with a palette token (dark `surface2`; light `surface3` in
+// 0.11.x, `surface4` in 0.12). Paseo 0.16.0 derives the selection from the
+// sidebar colour instead (`surfaceSidebarSelected ?? derived.selected`;
+// upstream #9579); on dark themes that lands within a few levels of
+// `surface2` (oxocarbon: #29292a against #262626), so dark still steps up.
+// Plugin themes always pass a selection in 0.16, derived when the theme names
+// none, so the dark replacement ignores it rather than falling back to
+// `surface3`. Each factory is told apart by the scheme its derivation names.
+export const SELECTION_FILLS: VariantReTableEntry[] = [
   {
-    // Dark themes select with `surface2` (base01), the same colour as the
-    // hover fill, so the selection steps up to `surface3` (oxocarbon base02)
-    // at 80% to stay distinct; light themes keep their own token (`surface3`
-    // in 0.11.x, `surface4` in 0.12).
     label: "glass selection (dark)",
-    pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.surface2,surfaceWorkspace:/g,
-    replacement: "surfaceSidebarSelected:__paseoAlpha($1.surface3,0.8),surfaceWorkspace:",
     expect: 1,
+    variants: [
+      {
+        pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.surface2,surfaceWorkspace:/g,
+        replacement: "surfaceSidebarSelected:__paseoAlpha($1.surface3,0.8),surfaceWorkspace:",
+      },
+      {
+        pattern:
+          /(deriveSurfaceStates\)\(([A-Za-z_$][\w$]*)\.surfaceSidebar,[\w$.]+,"dark"\);return\{[^{}]*?surfaceSidebarSelected:)\2\.surfaceSidebarSelected\?\?[\w$]+\.selected,/g,
+        replacement: "$1__paseoAlpha($2.surface3,0.8),",
+      },
+    ],
   },
   {
     label: "glass selection (light)",
-    pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.(surface[34]),surfaceWorkspace:/g,
-    replacement: "surfaceSidebarSelected:__paseoAlpha($1.$2,0.8),surfaceWorkspace:",
     expect: 1,
+    variants: [
+      {
+        pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.(surface[34]),surfaceWorkspace:/g,
+        replacement: "surfaceSidebarSelected:__paseoAlpha($1.$2,0.8),surfaceWorkspace:",
+      },
+      {
+        pattern:
+          /(deriveSurfaceStates\)\(([A-Za-z_$][\w$]*)\.surfaceSidebar,[\w$.]+,"light"\);return\{[^{}]*?surfaceSidebarSelected:)(\2\.surfaceSidebarSelected\?\?[\w$]+\.selected),/g,
+        replacement: "$1__paseoAlpha($3,0.8),",
+      },
+    ],
   },
 ];
 
@@ -716,6 +751,7 @@ export const BUILD_TABLES = {
   WINDOW_CHROME_PAYLOAD,
   ALPHA_HELPER,
   SURFACE_PATCHES,
+  SELECTION_FILLS,
   OXOCARBON_ANSI,
   STOCK_ANSI,
   DIFF_PALETTE,

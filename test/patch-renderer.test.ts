@@ -307,6 +307,41 @@ test("patchRenderer notes the diff scroll as absent on a Paseo whose diff canvas
   assert.ok(notes.includes("absent  clear diff canvas before scroll: not in this Paseo"));
 });
 
+const FACTORIES_0_15 =
+  "function k(t){return{surfaceSidebarSelected:t.surface4,surfaceWorkspace:t.surface0}}" +
+  "function O(t){return{surfaceSidebarSelected:t.surface2,surfaceWorkspace:t.surface1}}";
+const FACTORIES_0_16 =
+  'function k(t){const c=(0,n.deriveSurfaceStates)(t.surfaceSidebar,t.foreground,"light");return{surface0:t.surface0,surfaceSidebar:t.surfaceSidebar,surfaceSidebarHover:t.surfaceSidebarHover??c.hover,surfaceSidebarSelected:t.surfaceSidebarSelected??c.selected,surfaceWorkspace:t.surface0}}' +
+  'function O(t){const c=t.foreground??"#fafafa",f=(0,n.deriveSurfaceStates)(t.surfaceSidebar,c,"dark");return{surface0:t.surface0,surfaceSidebar:t.surfaceSidebar,surfaceSidebarHover:t.surfaceSidebarHover??f.hover,surfaceSidebarSelected:t.surfaceSidebarSelected??f.selected,surfaceWorkspace:t.surface1}}';
+
+type Factory = (palette: Record<string, string>) => { surfaceSidebarSelected: string };
+
+function patchedFactories(factories: string): { light: Factory; dark: Factory } {
+  const { src, notes } = patchRenderer(factories, DEFAULT_TERM);
+  assert.ok(notes.includes("ok      glass selection (dark) (1x)"));
+  assert.ok(notes.includes("ok      glass selection (light) (1x)"));
+  const derive = { deriveSurfaceStates: () => ({ hover: "#202020", selected: "#29292a" }) };
+  const [light, dark] = new Function("n", `${src};return [k,O];`)(derive) as [Factory, Factory];
+  return { light, dark };
+}
+
+const SELECTION_PALETTE = { surface2: "#262626", surface3: "#414243", surface4: "#565758", surfaceSidebar: "#161616" };
+
+test("patchRenderer glasses the selection with the palette tokens Paseo 0.15 selects with", () => {
+  const { light, dark } = patchedFactories(FACTORIES_0_15);
+  assert.equal(dark(SELECTION_PALETTE).surfaceSidebarSelected, "rgba(65, 66, 67, 0.8)");
+  assert.equal(light(SELECTION_PALETTE).surfaceSidebarSelected, "rgba(86, 87, 88, 0.8)");
+});
+
+test("patchRenderer glasses Paseo 0.16's derived selection, stepping dark themes up to surface3", () => {
+  const { light, dark } = patchedFactories(FACTORIES_0_16);
+  const pluginTheme = { ...SELECTION_PALETTE, surfaceSidebarSelected: "#123456" };
+  assert.equal(dark(SELECTION_PALETTE).surfaceSidebarSelected, "rgba(65, 66, 67, 0.8)");
+  assert.equal(dark(pluginTheme).surfaceSidebarSelected, "rgba(65, 66, 67, 0.8)");
+  assert.equal(light(SELECTION_PALETTE).surfaceSidebarSelected, "rgba(41, 41, 42, 0.8)");
+  assert.equal(light(pluginTheme).surfaceSidebarSelected, "rgba(18, 52, 86, 0.8)");
+});
+
 test("patchRenderer maps Paseo 0.13's tab chip backdrops to the glass fills", () => {
   const colors = {
     surface1: "s1",
