@@ -35,9 +35,15 @@ import { buildRpc, checkUpdateRpc, getSettingsRpc, setSettingsRpc, statusRpc } f
 import type { VibrancyStatus } from "../shared/rpc.ts";
 import { compareVersions } from "../shared/version.ts";
 import RangeRow from "./RangeRow.tsx";
+import { useWideHostColumn } from "./wide-host-column.ts";
 
 const SET_SETTINGS_DEBOUNCE_MS = 150;
 const BUILD_POLL_MS = 500;
+
+/** Wide enough for two columns of cards side by side. */
+const TWO_COLUMN_MIN = 960;
+/** The host's own margin below each section, so the columns sit as far apart as the cards stack. */
+const COLUMN_GAP = 24;
 
 /** `0-60` for the blur slider's native-platform fallback (discrete steps). */
 const BLUR_STEPS = [0, 10, 20, 30, 40, 50, 60];
@@ -244,6 +250,10 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
   }
 
   const isWeb = layout.platform === "web";
+  const rootRef = useRef<View>(null);
+  useWideHostColumn(rootRef, isWeb && !layout.compact);
+  const [width, setWidth] = useState(0);
+  const twoColumns = isWeb && !layout.compact && width >= TWO_COLUMN_MIN;
   const runningVibrancyBuild = status?.runningVibrancyBuild ?? false;
   const appearanceDisabled = !settingsLoaded || !runningVibrancyBuild || busy || polling;
   const blurDisabled = appearanceDisabled || settings.material !== "none";
@@ -253,7 +263,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
     latest !== null && status?.runningVersion != null && compareVersions(latest.version, status.runningVersion) > 0;
 
   const appearanceSection = (
-    <SettingsSection title="Appearance">
+    <SettingsSection key="appearance" title="Appearance">
       <SettingsCard>
         {!runningVibrancyBuild && (
           <SettingsRow label="Not running the Vibrancy build" hint="Build below to enable live appearance controls." />
@@ -318,7 +328,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
   );
 
   const tabsSection = (
-    <SettingsSection title="Tabs">
+    <SettingsSection key="tabs" title="Tabs">
       <SettingsCard>
         <SettingsSwitch
           label="Open files in a new tab"
@@ -332,7 +342,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
   );
 
   const browserSection = (
-    <SettingsSection title="Browser">
+    <SettingsSection key="browser" title="Browser">
       <SettingsCard>
         <SettingsSwitch
           label="WebHID device chooser"
@@ -354,7 +364,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
     updateSettings({ ...settings, terminal: { ...terminal, ...patch } });
 
   const terminalSection = (
-    <SettingsSection title="Terminal">
+    <SettingsSection key="terminal" title="Terminal">
       <SettingsCard>
         <SettingsSwitch
           label="Follow Ghostty config"
@@ -480,7 +490,7 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
   const progressPercent = progress ? Math.round(progress.fraction * 100) : 0;
 
   const buildSection = (
-    <SettingsSection title="Build">
+    <SettingsSection key="build" title="Build">
       <SettingsCard>
         {needsRebuild && (
           <SettingsRow label="Rebuild to apply changes" hint="Terminal changes apply to the next build." />
@@ -548,13 +558,24 @@ export default function VibrancyScreen({ theme, layout }: PluginSurfaceProps) {
     </SettingsSection>
   );
 
+  const columns = [
+    [appearanceSection, tabsSection, browserSection],
+    [terminalSection, buildSection],
+  ];
+
   return (
-    <>
-      {appearanceSection}
-      {tabsSection}
-      {browserSection}
-      {terminalSection}
-      {buildSection}
-    </>
+    <View
+      ref={rootRef}
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      style={twoColumns ? { flexDirection: "row", alignItems: "flex-start", gap: COLUMN_GAP } : undefined}
+    >
+      {twoColumns
+        ? columns.map((column, index) => (
+            <View key={index} style={{ flex: 1, minWidth: 0 }}>
+              {column}
+            </View>
+          ))
+        : columns.flat()}
+    </View>
   );
 }
