@@ -43,9 +43,11 @@ export const STAMP_NAME = ".vibrancy-build";
 
 // electron-updater reads this from the bundle. Pointing it at an address that
 // cannot resolve turns the update check into a logged failure instead of a
-// download that would overwrite the patches — and, on macOS, would be
-// rejected against the ad-hoc signature anyway. Rebuilding happens from the
-// paseo-vibrancy plugin's settings screen, not a standalone script.
+// download that would overwrite the patches. Nothing else stops one on macOS:
+// Squirrel.Mac only checks an update against the running copy's designated
+// requirement, and `DESIGNATED_REQUIREMENT` names just the bundle id, which
+// a Developer ID-signed stock Paseo update satisfies. Rebuilding happens from
+// the paseo-vibrancy plugin's settings screen, not a standalone script.
 export const DEAD_UPDATE_YML = `# neutered by the paseo-vibrancy plugin: this copy must never self-update.
 # Updates come from Settings -> Plugins -> paseo-vibrancy -> Vibrancy -> Update & restart.
 provider: generic

@@ -636,8 +636,12 @@ update completing).
   which stays the same across rebuilds and which stock Paseo also satisfies
   (`codesign --verify -R='identifier "sh.paseo.desktop"'` passes on it);
   the accepted cost is that any ad-hoc app claiming that id matches the
-  grant. `codesign --deep -r=…` is wrong here: it stamps the outer
-  identifier onto the helpers (`sh.paseo.desktop.helper`, …) and
+  grant. A second cost: Squirrel.Mac accepts an update that satisfies the
+  running app's DR, and a Developer ID-signed stock Paseo update does, so
+  the dead `app-update.yml` feed (`DEAD_UPDATE_YML`) is now the only thing
+  keeping an update from overwriting the patched copy.
+  `codesign --deep -r=…` is wrong here: it stamps the outer identifier onto
+  the helpers (`sh.paseo.desktop.helper`, …) and
   `codesign --verify --deep --strict` then fails with "nested code is
   modified or invalid". A record created before this change still holds the
   old requirement, so it has to be removed (System Settings `−`, or
