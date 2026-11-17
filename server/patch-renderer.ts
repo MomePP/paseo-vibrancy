@@ -34,6 +34,7 @@ import {
   PANE,
   RENDERER_PATCHES,
   SCRIM_COLOURS,
+  SELECTION_FILLS,
   STOCK_ANSI,
   SURFACE_PATCHES,
   TAB_FILLS,
@@ -84,6 +85,9 @@ export function patchRenderer(src: string, term: TermMetrics): { src: string; no
 
   for (const { label, pattern, replacement, expect } of SURFACE_PATCHES) {
     patcher.replaceRe(label, pattern, replacement, expect);
+  }
+  for (const { label, variants, expect } of SELECTION_FILLS) {
+    patcher.replaceReFirst(label, variants, expect);
   }
 
   patcher.replaceRe(
@@ -162,7 +166,7 @@ export function patchRenderer(src: string, term: TermMetrics): { src: string; no
     ARCHIVE_HIDES_STAT.expect,
     ARCHIVE_HIDES_STAT.requires,
   );
-  patcher.replaceRe(LABELS_LINE.label, LABELS_LINE.pattern, LABELS_LINE.replacement, LABELS_LINE.expect);
+  patcher.replaceReFirst(LABELS_LINE.label, LABELS_LINE.variants, LABELS_LINE.expect);
   patcher.replaceReFirst(TAB_FILLS.label, TAB_FILLS.variants, TAB_FILLS.expect);
   for (const { label, pattern, replacement, expect } of TAB_GLASS) {
     patcher.replaceRe(label, pattern, replacement, expect);

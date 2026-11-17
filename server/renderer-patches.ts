@@ -23,6 +23,13 @@ export type ExpectedReTableEntry = ReTableEntry & {
   requires?: string;
 };
 
+/** One patch whose anchor differs between Paseo versions; `Patcher.replaceReFirst` applies the first shape present. */
+export type VariantReTableEntry = {
+  label: string;
+  expect: number;
+  variants: readonly { pattern: RegExp; replacement: string }[];
+};
+
 // --- the look (fixed) -------------------------------------------------------
 //
 // Every React surface token goes to alpha 0 — left non-zero, a nested
@@ -208,7 +215,7 @@ const OVERLAY_FILL = "var(--paseo-overlay-fill)";
 // active in an unfocused pane, and the `surfaceSidebar*` tokens on the
 // Explorer's rail. Hover maps to the overlay fill on both rails, the focused
 // tab to the selection, matching the sidebar rows.
-export const TAB_FILLS = {
+export const TAB_FILLS: VariantReTableEntry = {
   label: "glass tab fills",
   expect: 1,
   variants: [
@@ -222,7 +229,7 @@ export const TAB_FILLS = {
       replacement: `$1"surface1"===$2||"surfaceSidebarHover"===$2?"${OVERLAY_FILL}":$3.colors["surface2"===$2?"surfaceSidebarSelected":$2]`,
     },
   ],
-} as const;
+};
 
 export const TAB_GLASS: ExpectedReTableEntry[] = [
   {
@@ -282,20 +289,35 @@ export const TAB_GLASS: ExpectedReTableEntry[] = [
 // original row (every item except labels, still `·`-separated) and one row
 // per labels item, which is `leading` there so its chip inset lines up with
 // the branch icon. Captures every minified name so the rewrite only touches
-// the item map and the container style.
-export const LABELS_LINE: ExpectedReTableEntry = {
+// the item map and the container style. Paseo 0.16.0 reshaped the component
+// (upstream #7645, #9579), hence the second variant.
+export const LABELS_LINE: VariantReTableEntry = {
   label: "workspace labels on their own line",
-  pattern: new RegExp(
-    String.raw`(\w)=(\w)\.View,(\w)=([\w$]+)\.row,(\w)\[12\]!==(\w)\?\((\w)=\((\w),(\w)\)=>\(0,(\w)\.jsxs\)\((\w)\.Fragment,\{children:\[\9>0\?\(0,\10\.jsx\)\((\w)\.Text,\{style:\4\.separator,children:"\\xb7"\}\):null,\(0,\10\.jsx\)\((\w),\{item:\8,hostBadge:\6,leading:0===\9\}\)\]\},\8\.kind\),\5\[12\]=\6,\5\[13\]=\7\):\7=\5\[13\],(\w)=(\w)\.map\(\7\)`,
-    "g",
-  ),
-  replacement:
-    '$1=$2.View,$3={flexDirection:"column",gap:2,minWidth:0},' +
-    '$5[12]!==$6?($7=($8,$9)=>(0,$10.jsxs)($11.Fragment,{children:[$9>0?(0,$10.jsx)($12.Text,{style:$4.separator,children:"\\xb7"}):null,' +
-    "(0,$10.jsx)($13,{item:$8,hostBadge:$6,leading:0===$9})]},$8.kind),$5[12]=$6,$5[13]=$7):$7=$5[13]," +
-    '$14=[(0,$10.jsx)($2.View,{style:$4.row,children:$15.filter(__pv=>"labels"!==__pv.kind).map($7)},"meta"),' +
-    '...$15.filter(__pv=>"labels"===__pv.kind).map(__pv=>(0,$10.jsx)($2.View,{style:$4.row,children:(0,$10.jsx)($13,{item:__pv,hostBadge:$6,leading:!0})},__pv.kind))]',
   expect: 1,
+  variants: [
+    {
+      pattern: new RegExp(
+        String.raw`(\w)=(\w)\.View,(\w)=([\w$]+)\.row,(\w)\[12\]!==(\w)\?\((\w)=\((\w),(\w)\)=>\(0,(\w)\.jsxs\)\((\w)\.Fragment,\{children:\[\9>0\?\(0,\10\.jsx\)\((\w)\.Text,\{style:\4\.separator,children:"\\xb7"\}\):null,\(0,\10\.jsx\)\((\w),\{item:\8,hostBadge:\6,leading:0===\9\}\)\]\},\8\.kind\),\5\[12\]=\6,\5\[13\]=\7\):\7=\5\[13\],(\w)=(\w)\.map\(\7\)`,
+        "g",
+      ),
+      replacement:
+        '$1=$2.View,$3={flexDirection:"column",gap:2,minWidth:0},' +
+        '$5[12]!==$6?($7=($8,$9)=>(0,$10.jsxs)($11.Fragment,{children:[$9>0?(0,$10.jsx)($12.Text,{style:$4.separator,children:"\\xb7"}):null,' +
+        "(0,$10.jsx)($13,{item:$8,hostBadge:$6,leading:0===$9})]},$8.kind),$5[12]=$6,$5[13]=$7):$7=$5[13]," +
+        '$14=[(0,$10.jsx)($2.View,{style:$4.row,children:$15.filter(__pv=>"labels"!==__pv.kind).map($7)},"meta"),' +
+        '...$15.filter(__pv=>"labels"===__pv.kind).map(__pv=>(0,$10.jsx)($2.View,{style:$4.row,children:(0,$10.jsx)($13,{item:__pv,hostBadge:$6,leading:!0})},__pv.kind))]',
+    },
+    {
+      pattern: new RegExp(
+        String.raw`(\(0,([\w$]+)\.jsx\)\(([\w$]+),\{item:[\w$]+,hostBadge:([\w$]+),leading:0===[\w$]+\}\)\]\},[\w$]+\.kind\),[^;]*\):([\w$]+)=[\w$]+\[\d+\];const ([\w$]+)=)([\w$]+)\.map\(\5\)(;let ([\w$]+),([\w$]+);[^;]*;[^?]*\?\(\10=\(0,\2\.jsxs\)\(([\w$]+),\{style:)([\w$]+)\.row,children:\[\6,\9\]\}\)`,
+        "g",
+      ),
+      replacement:
+        '$1$7.filter(__pv=>"labels"!==__pv.kind).map($5)$8{flexDirection:"column",gap:2,minWidth:0},' +
+        'children:[(0,$2.jsxs)($11,{style:$12.row,children:[$6,$9]},"meta"),' +
+        '...$7.filter(__pv=>"labels"===__pv.kind).map(__pv=>(0,$2.jsx)($11,{style:$12.row,children:(0,$2.jsx)($3,{item:__pv,hostBadge:$4,leading:!0})},__pv.kind))]})',
+    },
+  ],
 };
 
 // The pane resize handle's hover/drag highlight: oxocarbon's accent is a
@@ -352,9 +374,7 @@ export const ALPHA_HELPER =
   '+parseInt(v.slice(4,6),16)+", "+a+")"};\n';
 
 // The four large-area surface tokens (surface0, background, sidebar,
-// workspace), alpha 0 always, plus the selection: the selected sidebar row
-// (and, through TAB_GLASS, the focused tab) is the theme's selection colour
-// at 0.6, glass blended with what is behind it rather than an opaque slab.
+// workspace), alpha 0 always.
 // Patches the theme factories' *outputs*, not the palettes feeding them:
 // `surface0` is also `primaryForeground` and `surface2` is `popover`/`input`/
 // `muted`, so an alpha at the palette would make button text and popovers
@@ -391,21 +411,49 @@ export const SURFACE_PATCHES: ExpectedReTableEntry[] = [
     replacement: "surfaceWorkspace:__paseoAlpha($1.surface1,0.0),interactionHighlight:",
     expect: 1,
   },
+];
+
+const SELECTION_ALPHA = 0.8;
+// Dark themes select with about the hover fill's colour (oxocarbon on 0.16.0:
+// #29292a against #262626), so dark steps up a token to stay distinct.
+const DARK_SELECTION_TOKEN = "surface3";
+
+// The selected sidebar row (and, through TAB_GLASS, the focused tab) is glass
+// blended with what is behind it rather than an opaque slab. Up to
+// 0.16.0-beta.1 the factories select with a palette token (dark `surface2`;
+// light `surface3` in 0.11.x, `surface4` in 0.12); Paseo 0.16.0 derives it
+// from the sidebar colour (`surfaceSidebarSelected ?? derived.selected`;
+// upstream #9579).
+export const SELECTION_FILLS: VariantReTableEntry[] = [
   {
-    // Dark themes select with `surface2` (base01), the same colour as the
-    // hover fill, so the selection steps up to `surface3` (oxocarbon base02)
-    // at 80% to stay distinct; light themes keep their own token (`surface3`
-    // in 0.11.x, `surface4` in 0.12).
     label: "glass selection (dark)",
-    pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.surface2,surfaceWorkspace:/g,
-    replacement: "surfaceSidebarSelected:__paseoAlpha($1.surface3,0.8),surfaceWorkspace:",
     expect: 1,
+    variants: [
+      {
+        pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.surface2,surfaceWorkspace:/g,
+        replacement: `surfaceSidebarSelected:__paseoAlpha($1.${DARK_SELECTION_TOKEN},${SELECTION_ALPHA}),surfaceWorkspace:`,
+      },
+      {
+        pattern:
+          /(deriveSurfaceStates\)\(([A-Za-z_$][\w$]*)\.surfaceSidebar,[\w$.]+,"dark"\);return\{[^{}]*?surfaceSidebarSelected:)\2\.surfaceSidebarSelected\?\?[\w$]+\.selected,/g,
+        replacement: `$1__paseoAlpha($2.${DARK_SELECTION_TOKEN},${SELECTION_ALPHA}),`,
+      },
+    ],
   },
   {
     label: "glass selection (light)",
-    pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.(surface[34]),surfaceWorkspace:/g,
-    replacement: "surfaceSidebarSelected:__paseoAlpha($1.$2,0.8),surfaceWorkspace:",
     expect: 1,
+    variants: [
+      {
+        pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.(surface[34]),surfaceWorkspace:/g,
+        replacement: `surfaceSidebarSelected:__paseoAlpha($1.$2,${SELECTION_ALPHA}),surfaceWorkspace:`,
+      },
+      {
+        pattern:
+          /(deriveSurfaceStates\)\(([A-Za-z_$][\w$]*)\.surfaceSidebar,[\w$.]+,"light"\);return\{[^{}]*?surfaceSidebarSelected:)(\2\.surfaceSidebarSelected\?\?[\w$]+\.selected),/g,
+        replacement: `$1__paseoAlpha($3,${SELECTION_ALPHA}),`,
+      },
+    ],
   },
 ];
 
@@ -753,6 +801,7 @@ export const BUILD_TABLES = {
   WINDOW_CHROME_PAYLOAD,
   ALPHA_HELPER,
   SURFACE_PATCHES,
+  SELECTION_FILLS,
   OXOCARBON_ANSI,
   STOCK_ANSI,
   DIFF_PALETTE,
