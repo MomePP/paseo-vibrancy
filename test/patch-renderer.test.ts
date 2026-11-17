@@ -102,7 +102,7 @@ test("rendererPath throws when index.html references a bundle missing on disk", 
 });
 
 test("patchIndexHtml rewrites the flash guard into the live color-mix wash and injects the floating-surfaces style", () => {
-  const html = "<head><style>html,\n body { background-color: #181b1a; }</style></head>";
+  const html = '<head><style>html,\n body { background-color: #181b1a; }</style></head><body><div id="root"></div></body>';
   const { html: patched, notes } = patchIndexHtml(html, "0 0 0 10px");
   assert.ok(
     patched.includes(
@@ -111,13 +111,26 @@ test("patchIndexHtml rewrites the flash guard into the live color-mix wash and i
   );
   assert.ok(patched.indexOf('<style id="paseo-vibrancy-floating-surfaces">') < patched.indexOf("</head>"));
   assert.ok(patched.includes("padding: 0 0 0 10px;"));
-  assert.deepEqual(notes, ["ok      window wash (1x)", "ok      glass floating surfaces (1x)"]);
+  assert.deepEqual(notes, [
+    "ok      window wash (1x)",
+    "ok      glass floating surfaces (1x)",
+    "ok      solid floating backdrop (1x)",
+  ]);
+});
+
+test("every filter the floating surfaces reference is defined in the patched document's body", () => {
+  const { html: patched } = patchIndexHtml('<head></head><body class="x"><div id="root"></div></body>', "0");
+  const referenced = [...patched.matchAll(/url\(#([\w-]+)\)/g)].map((m) => m[1]);
+  assert.ok(referenced.length > 0);
+  const body = patched.slice(patched.indexOf('<body class="x">'), patched.indexOf('<div id="root">'));
+  for (const id of new Set(referenced)) assert.ok(body.includes(`<filter id="${id}"`), `filter #${id} is defined before React's root`);
 });
 
 test("patchIndexHtml reports a MISSED note when the flash guard is absent, without skipping the style injection", () => {
   const { notes } = patchIndexHtml("<head></head>", "0 0 0 10px");
   assert.ok(notes[0]!.startsWith("MISSED  window wash"));
   assert.ok(notes[1]!.startsWith("ok      glass floating surfaces"));
+  assert.ok(notes[2]!.startsWith("MISSED  solid floating backdrop"));
 });
 
 test("patchRenderer swaps the resize handle's accent to the subtle token in both occurrences", () => {
