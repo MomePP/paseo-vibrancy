@@ -15,27 +15,23 @@ export interface WidthCapNode {
   style: { maxWidth: string };
 }
 
-export function findWidthCap<T extends WidthCapNode>(
-  node: T | null,
-  readMaxWidth: (element: T) => string,
-  limit = WIDE_SETTINGS_MAX,
-): T | null {
+export function findWidthCap<T extends WidthCapNode>(node: T | null, readMaxWidth: (element: T) => string): T | null {
   let element = node?.parentElement as T | null | undefined;
   for (let depth = 0; element && depth < MAX_ANCESTOR_HOPS; depth += 1) {
     const match = /^(\d+(?:\.\d+)?)px$/.exec(readMaxWidth(element).trim());
-    if (match) return Number(match[1]) < limit ? element : null;
+    if (match) return Number(match[1]) < WIDE_SETTINGS_MAX ? element : null;
     element = element.parentElement as T | null;
   }
   return null;
 }
 
-const renderer = globalThis as { getComputedStyle?: (element: WidthCapNode) => { maxWidth: string } };
+const renderer = globalThis as unknown as { getComputedStyle: (element: WidthCapNode) => { maxWidth: string } };
 
 export function useWideHostColumn(ref: RefObject<object | null>, enabled: boolean): void {
   useEffect(() => {
-    if (!enabled || !renderer.getComputedStyle) return;
+    if (!enabled) return;
     const node = ref.current as WidthCapNode | null;
-    const cap = findWidthCap(node, (element) => renderer.getComputedStyle!(element).maxWidth);
+    const cap = findWidthCap(node, (element) => renderer.getComputedStyle(element).maxWidth);
     if (!cap) return;
     const previous = cap.style.maxWidth;
     cap.style.maxWidth = `${WIDE_SETTINGS_MAX}px`;
