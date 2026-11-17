@@ -647,8 +647,11 @@ update completing).
   is a style property, so it follows a theme switch live: Dark to Light
   moved it from `rgb(30, 33, 32)` to `rgb(250, 250, 250)` without a reload.
   Trade-off: the window material no longer shows through a floating
-  surface; in-pane frost and glass are unchanged. Raising the fill instead
-  still leaked faintly at 0.85. Measured with a CDP sweep of every floating
+  surface; in-pane frost and glass are unchanged. The diff's sticky file
+  header canvas is in-pane too, so it keeps plain `GLASS_BLUR`
+  (`blur(24px) saturate(1.4)`, no flood): the code scrolling under it stays
+  faintly visible, as before. Raising the fill instead of flooding still leaked
+  faintly at 0.85. Measured with a CDP sweep of every floating
   root (fixed, z-indexed, top layer, floating roles, open shadow roots) in
   an isolated Paseo-Vibrancy 0.16.0 with better-paseo 1.6.0 (c85f2412) and
   the user's `paseo-vibrancy.json` (tint 0.6), on the Dark theme: Turn
@@ -663,9 +666,23 @@ update completing).
   `[popover]`, so the existing hook missed it) had no glass at all
   (`rgba(24, 27, 26, 0)`, no filter, leak 1); it is now hooked as the
   lone-text bubble after its `[role="button"]`/`[role="img"]` inside
-  `[data-bcroot]`. Testing note: Chromium caches the renderer bundle by its
-  hashed name, so after rewriting a copy's bundle in place reload with
-  `Page.reload({ ignoreCache: true })`, or the old inline styles stay.
+  `[data-bcroot]` that carries an inline `box-shadow`. That last part is
+  what keeps in-pane content out: an opened prose system card
+  (`system-card.tsx`, a `DisclosureHeader` with `role="button"`, then
+  `FadeIn` > body > one `Text`) has the same shape and took the overlay
+  fill and solid flood until it was added. The tooltip bubble's look comes
+  from `tooltipLook` (`toolbar-button.tsx`), a plain style object that
+  RN-web writes inline, while the card body's styles come from
+  `StyleSheet.create` and render as classes. The slot's `position:
+  absolute`, `z-index: 10` and `pointer-events: none` would say "floating"
+  more directly, but RN-web renders them as atomic class names only, which
+  no rule should key on. Measured over CDP: the Copy reply and start time
+  tooltips kept the overlay fill and the flooded blur, and the card body
+  went back to its stock `rgba(0, 0, 0, 0)` with no filter (its slab, the
+  `FadeIn`, stays `rgb(30, 33, 32)`). Testing note: Chromium caches the
+  renderer bundle by its hashed name, so after rewriting a copy's bundle in
+  place reload with `Page.reload({ ignoreCache: true })`, or the old inline
+  styles stay.
 - **Privacy grants follow the designated requirement, not the bundle id.**
   TCC stores the granting app's designated requirement (DR) with the grant
   and checks the running app against it. A plain ad-hoc signature's DR is

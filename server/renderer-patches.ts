@@ -719,7 +719,7 @@ export const FLOATING_SURFACES_CSS = `
          spans the whole file section, so only the canvas gets the glass. */
       [data-diff-sticky-header-path] canvas {
         background-color: ${OVERLAY_FILL};
-        backdrop-filter: ${FLOATING_BLUR};
+        backdrop-filter: ${GLASS_BLUR};
       }
       /* Paseo's shell gives every [tabindex] element -webkit-app-region:
          no-drag, and in the desktop window that region is where
@@ -736,7 +736,9 @@ export const FLOATING_SURFACES_CSS = `
       /* better-paseo's name tooltip has no test id or name: it is the
          lone-text bubble in a top-layer [popover] (which Paseo itself never
          opens), or, where nothing clips it, in the slot right after its
-         button inside better-paseo's own root */
+         button inside better-paseo's own root. In that slot only the
+         bubble's inline box-shadow (its tooltipLook) tells it from in-pane
+         content of the same shape, such as an opened system card's body */
       :is(
         [data-testid="menu-panel"],
         [data-testid="menu-submenu-panel"],
@@ -758,7 +760,7 @@ export const FLOATING_SURFACES_CSS = `
         [aria-label="Copy selected block"]:not(:active),
         div:has(> div > :is([aria-label="Copy as Markdown"], [aria-label="Copy as image"])),
         [popover]:not([data-testid]) > div:has(> div[dir="auto"]:only-child),
-        [data-bcroot] :is([role="button"], [role="img"]) + div > div:has(> div[dir="auto"]:only-child)
+        [data-bcroot] :is([role="button"], [role="img"]) + div > div[style*="box-shadow"]:has(> div[dir="auto"]:only-child)
       ) {
         background-color: ${OVERLAY_FILL} !important;
         backdrop-filter: ${FLOATING_BLUR} !important;
