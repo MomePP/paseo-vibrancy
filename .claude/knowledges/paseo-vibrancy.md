@@ -571,9 +571,11 @@ update completing).
   old shape and the 0.16.0 one. The 0.16.0 selection anchor tells the dark
   factory from the light one by the scheme its `deriveSurfaceStates` call
   names. Dark still glasses `surface3` at 0.8, since the derived dark
-  selection sits next to `surface2` (oxocarbon #29292a against #262626) and
-  plugin themes always pass a derived selection; light glasses its own
-  selection at 0.8. On 0.16.0 the labels rewrite maps every item but labels
+  selection sits next to `surface2` (oxocarbon #29292a against #262626).
+  The factory can't tell a theme's declared selection from the derived one
+  (the plugin-theme builder passes `sidebarSelected ?? derived.selected`), so
+  a dark plugin theme that declares `sidebarSelected` is overridden too;
+  light glasses its own selection at 0.8. On 0.16.0 the labels rewrite maps every item but labels
   into the meta row, keeps the plugin items on it, and adds one leading
   labels row under it. Verified in an isolated 0.16.0 copy over CDP with the
   Dark theme: the selected row's background is `rgba(67, 70, 69, 0.8)`
