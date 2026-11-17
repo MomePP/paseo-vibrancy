@@ -42,6 +42,16 @@ export function appExecutable(app: string, platform: HostPlatform = HOST_PLATFOR
   return platform === "win32" ? join(app, WINDOWS_EXE) : join(app, "Contents", "MacOS", execName(app));
 }
 
+/** `CFBundleIdentifier` from a macOS bundle's Info.plist. */
+export function bundleIdentifier(app: string): string {
+  const plist = readFileSync(join(app, "Contents", "Info.plist"), "utf8");
+  const match = plist.match(/<key>CFBundleIdentifier<\/key>\s*<string>([^<]*)<\/string>/);
+  if (!match) {
+    throw new Error(`bundleIdentifier: CFBundleIdentifier not found in ${app}/Contents/Info.plist`);
+  }
+  return match[1]!;
+}
+
 /**
  * The app's version: `CFBundleShortVersionString` from Info.plist on macOS;
  * on Windows (no plist, and the exe's version resource is awkward to reach)

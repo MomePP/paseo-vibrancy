@@ -24,7 +24,7 @@ import { fs, fsp } from "./fs.ts";
 import { resolveTerm } from "./ghostty.ts";
 import { readSettings } from "./settings-file.ts";
 import type { TermMetrics } from "./ghostty.ts";
-import { WINDOWS_EXE, appVersion, localAppData, resourcesDir } from "./layout.ts";
+import { WINDOWS_EXE, appVersion, bundleIdentifier, localAppData, resourcesDir } from "./layout.ts";
 import { PV_JS } from "./main-hook.ts";
 import { patchIndexHtml, patchRenderer, rendererPath } from "./patch-renderer.ts";
 import { BUILD_TABLES } from "./renderer-patches.ts";
@@ -151,6 +151,23 @@ async function copyTree(source: string, target: string): Promise<void> {
 }
 
 /**
+ * Ad-hoc signs `app` and everything nested in it. An ad-hoc signature's
+ * default designated requirement is its cdhash, which every rebuild changes,
+ * and TCC checks privacy grants such as Screen Recording against the
+ * requirement recorded when the grant was made, so a cdhash requirement
+ * loses the grant on each rebuild. The outer bundle is re-signed alone with
+ * an identifier-only requirement, which survives rebuilds; stock Paseo,
+ * sharing the bundle id, satisfies it too. `--deep -r` would stamp it onto
+ * the helpers as well, whose identifiers differ, and
+ * `codesign --verify --deep --strict` then rejects them.
+ */
+export async function signAdHoc(app: string): Promise<void> {
+  await execFileAsync("codesign", ["--force", "--deep", "--sign", "-", app]);
+  const requirement = `designated => identifier "${bundleIdentifier(app)}"`;
+  await execFileAsync("codesign", ["--force", "--sign", "-", `-r=${requirement}`, app]);
+}
+
+/**
  * Builds a patched copy of `opts.source` at `opts.staging` (signed, on
  * macOS). Any thrown error — a missing `app.asar`, an occurrence-count
  * mismatch, a failed codesign, an asar-integrity fuse that is on — deletes
@@ -269,7 +286,7 @@ export async function buildStaging(opts: {
     // unsigned.
     if (platform === "darwin") {
       opts.onStep?.("sign");
-      await execFileAsync("codesign", ["--force", "--deep", "--sign", "-", staging]);
+      await signAdHoc(staging);
     }
 
     return { report, missed };

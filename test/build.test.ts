@@ -1,15 +1,23 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { asarIntegrityFuse, buildFingerprint, buildStaging, serialiseFingerprintInputs, stampFor } from "../server/build.ts";
+import {
+  STAMP_NAME,
+  asarIntegrityFuse,
+  buildFingerprint,
+  buildStaging,
+  serialiseFingerprintInputs,
+  signAdHoc,
+  stampFor,
+} from "../server/build.ts";
 import { resolveTerm } from "../server/ghostty.ts";
 import type { TermMetrics } from "../server/ghostty.ts";
-import { appVersion, resourcesDir } from "../server/layout.ts";
+import { appVersion, bundleIdentifier, resourcesDir } from "../server/layout.ts";
 import { writeSettings } from "../server/settings-file.ts";
 import { TERMINAL_DEFAULTS, parseVibrancy } from "../shared/vibrancy.ts";
 import type { TerminalSettings } from "../shared/vibrancy.ts";
@@ -120,6 +128,55 @@ test("a Windows build refuses an exe whose asar-integrity fuse is on, before cop
   assert.equal(existsSync(staging), false);
 });
 
+const onMac = { skip: process.platform !== "darwin" ? "macOS only (codesign)" : false };
+
+function fakeBundle(app: string, id: string): void {
+  mkdirSync(join(app, "Contents", "MacOS"), { recursive: true });
+  writeFileSync(
+    join(app, "Contents", "Info.plist"),
+    `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>main</string>
+<key>CFBundleIdentifier</key><string>${id}</string>
+</dict></plist>
+`,
+  );
+  copyFileSync("/usr/bin/true", join(app, "Contents", "MacOS", "main"));
+}
+
+async function designatedRequirement(code: string): Promise<string> {
+  return (await execFileAsync("codesign", ["-d", "-r-", code])).stdout.trim();
+}
+
+async function cdhash(code: string): Promise<string> {
+  const { stderr } = await execFileAsync("codesign", ["-dvvv", code]);
+  return /^CDHash=(\w+)$/m.exec(stderr)![1]!;
+}
+
+test("a rebuilt copy keeps its identifier-only designated requirement, so privacy grants survive", onMac, async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "vibrancy-sign-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const app = join(dir, "Fake.app");
+  const helper = join(app, "Contents", "Frameworks", "Fake Helper.app");
+  fakeBundle(app, "test.vibrancy.fake");
+  fakeBundle(helper, "test.vibrancy.fake.helper");
+  const stamp = join(app, "Contents", "Resources", STAMP_NAME);
+  mkdirSync(join(app, "Contents", "Resources"));
+
+  writeFileSync(stamp, "first build\n");
+  await signAdHoc(app);
+  const firstHash = await cdhash(app);
+  assert.equal(await designatedRequirement(app), 'designated => identifier "test.vibrancy.fake"');
+  await execFileAsync("codesign", ["--verify", "--deep", "--strict", app]);
+  assert.doesNotMatch(await designatedRequirement(helper), /identifier "test\.vibrancy\.fake"$/);
+
+  writeFileSync(stamp, "second build\n");
+  await signAdHoc(app);
+  assert.notEqual(await cdhash(app), firstHash);
+  assert.equal(await designatedRequirement(app), 'designated => identifier "test.vibrancy.fake"');
+  await execFileAsync("codesign", ["--verify", "--deep", "--strict", app]);
+});
+
 const pristine = process.env.VIBRANCY_PRISTINE;
 
 async function realBuild(settings: { terminal: Partial<TerminalSettings> } | null) {
@@ -145,6 +202,7 @@ async function realBuild(settings: { terminal: Partial<TerminalSettings> } | nul
     assert.equal(existsSync(join(resources, "pv.js")), true);
     if (process.platform === "darwin") {
       await execFileAsync("codesign", ["--verify", "--deep", "--strict", staging]);
+      assert.equal(await designatedRequirement(staging), `designated => identifier "${bundleIdentifier(pristine!)}"`);
       assert.equal(existsSync(join(resources, "blur.node")), true);
     } else {
       assert.equal(existsSync(join(resources, "blur.node")), false);
