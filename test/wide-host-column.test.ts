@@ -10,10 +10,9 @@ interface FakeNode extends WidthCapNode {
   parentElement: FakeNode | null;
 }
 
-/** A chain from the outermost node to the innermost, which is returned. */
-function chain(...maxWidths: Array<[string, string]>): FakeNode {
+function innermostOf(...ancestors: Array<[string, string]>): FakeNode {
   let parent: FakeNode | null = null;
-  for (const [name, maxWidth] of maxWidths) {
+  for (const [name, maxWidth] of ancestors) {
     parent = { name, maxWidth, parentElement: parent, style: { maxWidth: "" } };
   }
   return parent!;
@@ -22,7 +21,7 @@ function chain(...maxWidths: Array<[string, string]>): FakeNode {
 const read = (node: FakeNode) => node.maxWidth;
 
 test("finds Paseo's page column above the plugin's wrappers", () => {
-  const root = chain(
+  const root = innermostOf(
     ["scroll", "none"],
     ["page", "1080px"],
     ["settings-content", "none"],
@@ -33,18 +32,18 @@ test("finds Paseo's page column above the plugin's wrappers", () => {
 });
 
 test("does not count the node it starts from", () => {
-  const root = chain(["page", "none"], ["plugin-root", "600px"]);
+  const root = innermostOf(["page", "none"], ["plugin-root", "600px"]);
   assert.equal(findWidthCap(root, read), null);
 });
 
 test("ignores percentages and leaves a host that is already wide enough alone", () => {
-  assert.equal(findWidthCap(chain(["page", "100%"], ["root", "none"]), read), null);
-  assert.equal(findWidthCap(chain(["page", `${WIDE_SETTINGS_MAX}px`], ["root", "none"]), read), null);
-  assert.equal(findWidthCap(chain(["outer", "720px"], ["page", "1600px"], ["root", "none"]), read), null);
+  assert.equal(findWidthCap(innermostOf(["page", "100%"], ["root", "none"]), read), null);
+  assert.equal(findWidthCap(innermostOf(["page", `${WIDE_SETTINGS_MAX}px`], ["root", "none"]), read), null);
+  assert.equal(findWidthCap(innermostOf(["outer", "720px"], ["page", "1600px"], ["root", "none"]), read), null);
 });
 
 test("gives up after a bounded number of ancestors", () => {
   const pairs: Array<[string, string]> = [["far", "720px"]];
   for (let index = 0; index < 20; index += 1) pairs.push([`wrapper-${index}`, "none"]);
-  assert.equal(findWidthCap(chain(...pairs), read), null);
+  assert.equal(findWidthCap(innermostOf(...pairs), read), null);
 });

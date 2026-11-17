@@ -40,7 +40,6 @@ import { useWideHostColumn } from "./wide-host-column.ts";
 const SET_SETTINGS_DEBOUNCE_MS = 150;
 const BUILD_POLL_MS = 500;
 
-/** Wide enough for two columns of cards side by side. */
 const TWO_COLUMN_MIN = 960;
 /** The host's own margin below each section, so the columns sit as far apart as the cards stack. */
 const COLUMN_GAP = 24;
