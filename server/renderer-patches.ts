@@ -686,7 +686,6 @@ export const FLOATING_SURFACES_CSS = `
         [data-testid="hover-preview"],
         [data-testid="toolbar-details-frame"],
         [data-testid="preview-line-selection-menu"],
-        [data-testid="details-row-menu"],
         [data-testid="details-zoom-badge"],
         [data-testid="details-back-to-latest"]:not(:active),
         [data-testid="details-drawer"],
@@ -701,7 +700,7 @@ export const FLOATING_SURFACES_CSS = `
         [data-testid="phone-scroll-bottom"],
         [aria-label="Copy selected block"]:not(:active),
         div:has(> div > :is([aria-label="Copy as Markdown"], [aria-label="Copy as image"])),
-        [popover]:not([data-testid], [data-bcselectionbar]) > div:has(> div[dir="auto"]:only-child)
+        [popover]:not([data-testid]) > div:has(> div[dir="auto"]:only-child)
       ) {
         background-color: ${OVERLAY_FILL} !important;
         backdrop-filter: ${GLASS_BLUR} !important;

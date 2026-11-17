@@ -582,7 +582,7 @@ update completing).
   panels that carry a role. better-paseo (RoundRedDot/better-paseo) fills its
   menus, hover preview, tooltips and floating controls with `surface0` and no
   role, so FLOATING_SURFACES_CSS has a block for it keyed on its test ids
-  (RN-web renders `testID` as `data-testid`), two accessible names, and the
+  (RN-web renders `testID` as `data-testid`), three accessible names, and the
   name tooltip's top-layer `[popover]` (Paseo 0.16 opens none of its own).
   Its selection bar lives in a shadow root: the fill goes through its
   `--bc-bar-bg` variable (an `!important` sheet rule beats the inline
