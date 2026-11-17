@@ -677,14 +677,9 @@ export const FLOATING_SURFACES_CSS = `
       [data-menu-surface="true"] {
         -webkit-app-region: initial !important;
       }
-      /* better-paseo: its floating surfaces fill with surface0 as well and
-         carry none of the hooks above, so they are matched by test id
-         (data-testid on web) or, lacking one, by accessible name. The
-         toolbar name tooltip has neither: it is the lone-text bubble in a
-         top-layer [popover], which Paseo itself never opens. Its in-pane
-         panels are left alone. A pressed button keeps its own feedback
-         fill. Same region reset as the menus above: the menus hang inside
-         their [tabindex] trigger and inherit its no-drag. */
+      /* better-paseo's name tooltip has no test id or name: it is the
+         lone-text bubble in a top-layer [popover], which Paseo itself never
+         opens */
       :is(
         [data-testid="menu-panel"],
         [data-testid="menu-submenu-panel"],
@@ -713,9 +708,8 @@ export const FLOATING_SURFACES_CSS = `
         border-color: transparent !important;
         -webkit-app-region: initial !important;
       }
-      /* the text selection bar draws in a shadow root: its fill is a
-         variable read from the host, and the blur goes on the host, rounded
-         like the bar (better-paseo's FLOAT.radius) */
+      /* the selection bar draws in a shadow root that reads its fill from a
+         variable on the host; 12px is better-paseo's FLOAT.radius */
       [data-bcselectionbar] {
         --bc-bar-bg: ${OVERLAY_FILL} !important;
         backdrop-filter: ${GLASS_BLUR} !important;
