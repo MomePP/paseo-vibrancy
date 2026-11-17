@@ -215,7 +215,7 @@ const OVERLAY_FILL = "var(--paseo-overlay-fill)";
 // active in an unfocused pane, and the `surfaceSidebar*` tokens on the
 // Explorer's rail. Hover maps to the overlay fill on both rails, the focused
 // tab to the selection, matching the sidebar rows.
-export const TAB_FILLS = {
+export const TAB_FILLS: VariantReTableEntry = {
   label: "glass tab fills",
   expect: 1,
   variants: [
@@ -229,7 +229,7 @@ export const TAB_FILLS = {
       replacement: `$1"surface1"===$2||"surfaceSidebarHover"===$2?"${OVERLAY_FILL}":$3.colors["surface2"===$2?"surfaceSidebarSelected":$2]`,
     },
   ],
-} as const;
+};
 
 export const TAB_GLASS: ExpectedReTableEntry[] = [
   {
