@@ -1,3 +1,5 @@
+// Adapted from better-paseo's client/ui/wide-host-column.ts
+// (github.com/RoundRedDot/better-paseo, MIT, Copyright (c) 2026 ABorakati).
 import { useEffect, type RefObject } from "react";
 
 /**
