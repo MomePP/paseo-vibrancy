@@ -156,9 +156,8 @@ async function copyTree(source: string, target: string): Promise<void> {
  * and TCC checks privacy grants such as Screen Recording against the
  * requirement recorded when the grant was made, so a cdhash requirement
  * loses the grant on each rebuild. The outer bundle is re-signed alone with
- * an identifier-only requirement, which survives rebuilds; stock Paseo,
- * sharing the bundle id, satisfies it too. `--deep -r` would stamp it onto
- * the helpers as well, whose identifiers differ, and
+ * an identifier-only requirement, which survives rebuilds. `--deep -r` would
+ * stamp it onto the helpers as well, whose identifiers differ, and
  * `codesign --verify --deep --strict` then rejects them.
  */
 export async function signAdHoc(app: string): Promise<void> {
