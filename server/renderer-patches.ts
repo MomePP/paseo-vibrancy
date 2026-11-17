@@ -289,10 +289,8 @@ export const TAB_GLASS: ExpectedReTableEntry[] = [
 // original row (every item except labels, still `·`-separated) and one row
 // per labels item, which is `leading` there so its chip inset lines up with
 // the branch icon. Captures every minified name so the rewrite only touches
-// the item map and the container style. Paseo 0.16.0 compiles the component
-// with separate memo slots, a separator style array and plugin row items
-// after the map (upstream #7645, #9579), so it has its own shape: the map
-// keeps every item but labels, and the plugin items stay on the meta row.
+// the item map and the container style. Paseo 0.16.0 reshaped the component
+// (upstream #7645, #9579), hence the second variant.
 export const LABELS_LINE: VariantReTableEntry = {
   label: "workspace labels on their own line",
   expect: 1,
@@ -415,19 +413,17 @@ export const SURFACE_PATCHES: ExpectedReTableEntry[] = [
   },
 ];
 
-// The selection: the selected sidebar row (and, through TAB_GLASS, the
-// focused tab) is a selection colour at 0.8, glass blended with what is
-// behind it rather than an opaque slab. Dark themes select with about the
-// hover fill's colour, so the selection steps up to `surface3` to stay
-// distinct; light themes keep their own selection. Up to 0.16.0-beta.1 the
-// factories select with a palette token (dark `surface2`; light `surface3` in
-// 0.11.x, `surface4` in 0.12). Paseo 0.16.0 derives the selection from the
-// sidebar colour instead (`surfaceSidebarSelected ?? derived.selected`;
-// upstream #9579); on dark themes that lands within a few levels of
-// `surface2` (oxocarbon: #29292a against #262626), so dark still steps up.
-// Plugin themes always pass a selection in 0.16, derived when the theme names
-// none, so the dark replacement ignores it rather than falling back to
-// `surface3`. Each factory is told apart by the scheme its derivation names.
+const SELECTION_ALPHA = 0.8;
+// Dark themes select with about the hover fill's colour (oxocarbon on 0.16.0:
+// #29292a against #262626), so dark steps up a token to stay distinct.
+const DARK_SELECTION_TOKEN = "surface3";
+
+// The selected sidebar row (and, through TAB_GLASS, the focused tab) is glass
+// blended with what is behind it rather than an opaque slab. Up to
+// 0.16.0-beta.1 the factories select with a palette token (dark `surface2`;
+// light `surface3` in 0.11.x, `surface4` in 0.12); Paseo 0.16.0 derives it
+// from the sidebar colour (`surfaceSidebarSelected ?? derived.selected`;
+// upstream #9579).
 export const SELECTION_FILLS: VariantReTableEntry[] = [
   {
     label: "glass selection (dark)",
@@ -435,12 +431,12 @@ export const SELECTION_FILLS: VariantReTableEntry[] = [
     variants: [
       {
         pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.surface2,surfaceWorkspace:/g,
-        replacement: "surfaceSidebarSelected:__paseoAlpha($1.surface3,0.8),surfaceWorkspace:",
+        replacement: `surfaceSidebarSelected:__paseoAlpha($1.${DARK_SELECTION_TOKEN},${SELECTION_ALPHA}),surfaceWorkspace:`,
       },
       {
         pattern:
           /(deriveSurfaceStates\)\(([A-Za-z_$][\w$]*)\.surfaceSidebar,[\w$.]+,"dark"\);return\{[^{}]*?surfaceSidebarSelected:)\2\.surfaceSidebarSelected\?\?[\w$]+\.selected,/g,
-        replacement: "$1__paseoAlpha($2.surface3,0.8),",
+        replacement: `$1__paseoAlpha($2.${DARK_SELECTION_TOKEN},${SELECTION_ALPHA}),`,
       },
     ],
   },
@@ -450,12 +446,12 @@ export const SELECTION_FILLS: VariantReTableEntry[] = [
     variants: [
       {
         pattern: /surfaceSidebarSelected:([A-Za-z_$][\w$]*)\.(surface[34]),surfaceWorkspace:/g,
-        replacement: "surfaceSidebarSelected:__paseoAlpha($1.$2,0.8),surfaceWorkspace:",
+        replacement: `surfaceSidebarSelected:__paseoAlpha($1.$2,${SELECTION_ALPHA}),surfaceWorkspace:`,
       },
       {
         pattern:
           /(deriveSurfaceStates\)\(([A-Za-z_$][\w$]*)\.surfaceSidebar,[\w$.]+,"light"\);return\{[^{}]*?surfaceSidebarSelected:)(\2\.surfaceSidebarSelected\?\?[\w$]+\.selected),/g,
-        replacement: "$1__paseoAlpha($3,0.8),",
+        replacement: `$1__paseoAlpha($3,${SELECTION_ALPHA}),`,
       },
     ],
   },
