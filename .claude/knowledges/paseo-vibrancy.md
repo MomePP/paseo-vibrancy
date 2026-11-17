@@ -231,7 +231,11 @@ theme plugin maps its eight colours onto Paseo's internal semantic set by
 bright the whole content pane reads, not `background`), `surface2→control`,
 `surface3→border`, `surface4→ring`, `surfaceSidebar→background`,
 `foregroundMuted→mutedForeground`, `foregroundExtraMuted→ring`. Getting this
-wrong silently produces a theme that applies but reads wrong.
+wrong silently produces a theme that applies but reads wrong. From 0.16.0 a
+plugin theme's `surface3`/`surface4` are derived from `background` and
+`foreground` unless the theme names them, and `surfaceSidebarSelected` is
+derived from the sidebar colour (upstream #9579): oxocarbon's `surface3` is
+#414243 there, not `border`.
 
 ## Release fetch and verification (`server/release.ts`)
 
@@ -557,6 +561,24 @@ update completing).
   (opacity 0, no reflow) whenever `showArchiveButton` is true. Verified in an
   isolated 0.16.0-beta.1 copy over CDP: on a hovered row the stat's opacity
   is 0 while the archive button shows.
+- **Paseo 0.16.0 derives the sidebar selection and recompiled
+  `WorkspaceMetaRow`** (upstream #9579 and #7645; 0.16.0-beta.1 still had the
+  old shapes). Both theme factories return
+  `surfaceSidebarSelected: tint.surfaceSidebarSelected ?? derived.selected`,
+  and the meta row gained plugin row items after its item map, so the two
+  selection patches and `LABELS_LINE` missed. `SELECTION_FILLS` and
+  `LABELS_LINE` are now `variants` entries (`VariantReTableEntry`) holding the
+  old shape and the 0.16.0 one. The 0.16.0 selection anchor tells the dark
+  factory from the light one by the scheme its `deriveSurfaceStates` call
+  names. Dark still glasses `surface3` at 0.8, since the derived dark
+  selection sits next to `surface2` (oxocarbon #29292a against #262626) and
+  plugin themes always pass a derived selection; light glasses its own
+  selection at 0.8. On 0.16.0 the labels rewrite maps every item but labels
+  into the meta row, keeps the plugin items on it, and adds one leading
+  labels row under it. Verified in an isolated 0.16.0 copy over CDP with the
+  Dark theme: the selected row's background is `rgba(67, 70, 69, 0.8)`
+  (`surface3` #434645 at 0.8), and the `hardware` chip sits at 289-305px
+  under the branch at 271-287px.
 - **The diff canvas scrolls by drawing itself back shifted.** Its canvas is
   three viewports tall and moves when the scroll nears an edge. To keep the
   rows still in view it copies itself to a scratch canvas (`"copy"`) and
